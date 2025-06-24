@@ -1,35 +1,7 @@
+from fastapi import HTTPException
 import requests
-import os
-from fastapi import HTTPException, Body
-from PIL import Image
 import base64
 import re
-
-# def get_image_from_url(url):
-#     """
-#     Download image from URL and return as bytes
-#     """
-#     try:
-#         response = requests.get(url, stream=True, timeout=10)
-#         response.raise_for_status()
-#         if not response.headers.get("Content-Type", "").startswith("image/"):
-#             raise ValueError("URL is not an image.")
-#         return response.content
-#     except Exception as e:
-#         raise HTTPException(status_code=400, detail=f"Image download failed: {str(e)}")
-    
-# def get_image_from_path(path):
-#     """
-#     Read image from local file path
-#     """
-#     try:
-#         if not os.path.exists(path):
-#             raise ValueError("File not found.")
-#         with open(path, "rb") as f:
-#             return f.read()
-#     except Exception as e:
-#         raise HTTPException(status_code=400, detail=f"Reading local image failed: {str(e)}")
-
 
 # Fungsi untuk mengambil gambar dari URL
 def get_image_from_url(image_url: str) -> bytes:
@@ -115,7 +87,8 @@ def extract_ingredients_section(text: str) -> str:
     Akan mencari kata 'Ingredients' atau 'Bahan' dan mengambil teks setelahnya,
     sampai akhir kalimat atau titik terakhir (jika tidak ada penanda khusus).
     """
-    match = re.search(r'(?:Ingredients|Bahan)\s*[:：]?\s*(.+)', text, re.IGNORECASE)
+    pattern = r"(?:Ingredients|Bahan-bahan|Bahan)\s*[:：]?\s*(.+)"
+    match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
     if match:
         return match.group(1).strip()
-    return "Bagian Ingredients tidak ditemukan."
+    return "Ingredients tidak ditemukan."
