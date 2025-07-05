@@ -1,6 +1,7 @@
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from google import genai
 from enum import Enum
@@ -18,6 +19,19 @@ load_dotenv()
 app = FastAPI(title="SkinSight API", 
                 description="API for skincare recommendations",
                 version="1.0.0")
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        os.getenv("CORS_ORIGIN"),
+        "http://localhost:3000", 
+    ],
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+
 
 class SkinType(str, Enum):
     oily = "oily"
