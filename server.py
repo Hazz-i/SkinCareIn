@@ -1,11 +1,12 @@
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Body
+from fastapi import FastAPI, HTTPException, Body, File, UploadFile, Form
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from google import genai
 from enum import Enum
 import os
+import io
 
 from helper import (
     get_image_from_url, get_image_from_path, extract_text_from_image, 
@@ -42,12 +43,10 @@ class SkinType(str, Enum):
 
 class ScanIngredientsRequest(BaseModel):
     image_url: str | None = None
-    image_path: str | None = None
     skin_type: SkinType
 
 class PredictRequest(BaseModel):
     image_url: str | None = None
-    image_path: str | None = None
     
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
@@ -64,13 +63,16 @@ def index():
 # === Read Ingredients Endpoint ===
 @app.post("/read-ingredients", response_model=dict)
 async def read_ingredients(
-    data: ScanIngredientsRequest = Body(...)
+    file: UploadFile = File(None),
+    image_url: str = Form(None),
+    skin_type: str = Form(...)
 ):
     """
     Scan skincare product image and analyze ingredients based on skin type
     
     Parameters:
-        - image_url/image_path: URL or path to product image 
+        - file: Uploaded image file
+        - image_url: URL to product image (alternative to file)
         - skin_type: User's skin type (oily, dry, normal, acne, sensitive)
         
     Returns:
@@ -80,13 +82,28 @@ async def read_ingredients(
         - Skin safety recommendation
     """
     try:
-        if not data.image_url and not data.image_path:
-            raise HTTPException(status_code=400, detail="Image URL atau path diperlukan.")
+        if not file and not image_url:
+            raise HTTPException(status_code=400, detail="File gambar atau URL gambar diperlukan.")
+        
+        # Validate skin_type
+        valid_skin_types = ["oily", "dry", "normal", "acne", "sensitive"]
+        if skin_type not in valid_skin_types:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Skin type tidak valid. Pilihan yang tersedia: {', '.join(valid_skin_types)}"
+            )
         
         # Extract text from image
-        image_bytes = get_image_from_url(data.image_url) if data.image_url else get_image_from_path(data.image_path)
-        extracted_text = extract_text_from_image(image_bytes, client)
-        
+        if file:
+            # Read uploaded file as bytes
+            file_content = await file.read()
+            # Pass bytes directly, not BytesIO
+            extracted_text = extract_text_from_image(file_content, client)
+        else:
+            # Get image from URL
+            image_bytes = get_image_from_url(image_url)
+            extracted_text = extract_text_from_image(image_bytes, client)
+            
         if not extracted_text:
             raise HTTPException(status_code=404, detail="Tidak ada teks yang ditemukan dalam gambar.")
         
@@ -98,14 +115,13 @@ async def read_ingredients(
         ingredients_list = parse_ingredients_to_list(ingredients_text)
         
         # Get ingredients to avoid based on skin type
-        avoid_list = get_ingredients_to_avoid(data.skin_type)
+        avoid_list = get_ingredients_to_avoid(skin_type)
         
         # Find harmful ingredients with detailed explanations
-        harmful_ingredients = find_harmful_ingredients_with_details(ingredients_text, avoid_list, data.skin_type.value)
+        harmful_ingredients = find_harmful_ingredients_with_details(ingredients_text, avoid_list, skin_type)
         
         # Create recommendation
         is_safe = len(harmful_ingredients) == 0
-        
         
         return {
             "extracted_ingredients": ingredients_list,
@@ -116,19 +132,27 @@ async def read_ingredients(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing image: {str(e)}")
-    
+
 # === Predict Endpoint ===
-@app.post("/predict")
-async def predict(data: PredictRequest = Body(...)):
+@app.post("/predict-skin")
+async def predict(
+    file: UploadFile = File(None),
+    image_url: str = Form(None)
+):
     try:
-        if not data.image_url and not data.image_path:
-            raise HTTPException(status_code=400, detail="Image URL atau path diperlukan.")
+        if not file and not image_url:
+            raise HTTPException(status_code=400, detail="File gambar atau URL gambar diperlukan.")
         
-        # Get image from URL or path
-        image_bytes = get_image_from_url(data.image_url) if data.image_url else get_image_from_path(data.image_path)
-        
-        # Predict skin type using helper function
-        result = predict_skin_type_from_image(image_bytes, model, transform, index_label)
+        # Get image from file or URL
+        if file:
+            # Read uploaded file as bytes
+            file_content = await file.read()
+            # Pass bytes directly for skin type prediction
+            result = predict_skin_type_from_image(file_content, model, transform, index_label)
+        else:
+            # Get image from URL
+            image_bytes = get_image_from_url(image_url)
+            result = predict_skin_type_from_image(image_bytes, model, transform, index_label)
 
         return JSONResponse(result)
 
