@@ -4,26 +4,24 @@ FROM python:3.11-slim
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies including OpenCV requirements
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    libgl1-mesa-glx \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python dependencies
+# Copy requirements file
 COPY requirements.txt .
 
-# Install only necessary packages for production
-RUN pip install --no-cache-dir \
-    fastapi==0.115.13 \
-    uvicorn==0.34.3 \
-    pydantic==2.11.7 \
-    python-dotenv==1.1.0 \
-    requests==2.32.4 \
-    pillow==11.2.1 \
-    torch \
-    torchvision \
-    google-genai==1.21.1
+# Install Python dependencies from requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
