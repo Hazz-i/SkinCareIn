@@ -12,7 +12,8 @@ from helper import (
     get_image_from_url, get_image_from_path, extract_text_from_image, 
     clean_extracted_text, extract_ingredients_section, find_harmful_ingredients_with_details, 
     parse_ingredients_to_list, get_ingredients_to_avoid, load_resnet_skin_classifier, 
-    get_skin_type_label_mapping, predict_skin_type_from_image
+    get_skin_type_label_mapping, predict_skin_type_from_image, detect_face_in_image,
+    enhanced_face_detection
 )
 
 load_dotenv()
@@ -141,20 +142,88 @@ async def predict(
 ):
     try:
         if not file and not image_url:
-            raise HTTPException(status_code=400, detail="File gambar atau URL gambar diperlukan.")
+            raise HTTPException(
+                status_code=400, 
+                detail="File gambar atau URL gambar diperlukan."
+            )
         
-        # Get image from file or URL
+        image_bytes = None
+        
+        # Get image from file or URL with validation
         if file:
+            # Validate file type
+            if not file.content_type.startswith("image/"):
+                raise HTTPException(
+                    status_code=400,
+                    detail="File yang diupload harus berupa gambar (JPEG, PNG, dll)."
+                )
+            
+            # Validate file size (max 10MB)
+            if file.size > 10 * 1024 * 1024:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Ukuran file terlalu besar. Maksimal 10MB."
+                )
+            
             # Read uploaded file as bytes
-            file_content = await file.read()
-            # Pass bytes directly for skin type prediction
-            result = predict_skin_type_from_image(file_content, model, transform, index_label)
+            image_bytes = await file.read()
+            
+            # Validate if file is readable image
+            if not image_bytes:
+                raise HTTPException(
+                    status_code=400,
+                    detail="File gambar tidak dapat dibaca atau rusak."
+                )
+                
         else:
-            # Get image from URL
-            image_bytes = get_image_from_url(image_url)
-            result = predict_skin_type_from_image(image_bytes, model, transform, index_label)
-
+            try:
+                # Get image from URL with timeout and validation
+                image_bytes = get_image_from_url(image_url)
+                if not image_bytes:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="URL gambar tidak dapat diakses atau tidak valid."
+                    )
+            except Exception as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Gagal mengambil gambar dari URL: {str(e)}"
+                )
+        
+        # Enhanced face detection with multiple validations
+        face_detection_result = enhanced_face_detection(image_bytes)
+        
+        if not face_detection_result["has_face"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Face detection failed: {face_detection_result['reason']}. "
+                       "Please ensure the image contains a clear human face facing the camera."
+            )
+        
+        # Additional validation for face quality
+        if face_detection_result["face_count"] > 1:
+            raise HTTPException(
+                status_code=400,
+                detail="Multiple faces detected in the image. "
+                       "Please use a photo with only one face."
+            )
+        
+        # Validate face size and clarity
+        if not face_detection_result["is_clear"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Face quality insufficient: {face_detection_result['reason']}"
+            )
+        
+        # Pass bytes directly for skin type prediction
+        result = predict_skin_type_from_image(image_bytes, model, transform, index_label)
+        
         return JSONResponse(result)
 
+    except HTTPException:
+        raise
     except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Terjadi kesalahan dalam memproses gambar: {str(e)}"
+        )
