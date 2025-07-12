@@ -9,12 +9,13 @@ import os
 import io
 
 from helper import (
-    get_image_from_url, get_image_from_path, extract_text_from_image, 
+    get_image_from_url, extract_text_from_image, 
     clean_extracted_text, extract_ingredients_section, find_harmful_ingredients_with_details, 
     parse_ingredients_to_list, get_ingredients_to_avoid, load_resnet_skin_classifier, 
-    get_skin_type_label_mapping, predict_skin_type_from_image, detect_face_in_image,
-    enhanced_face_detection
+    get_skin_type_label_mapping, predict_skin_type_from_image, enhanced_face_detection
 )
+
+from helper.recommendations import get_skincare_recommendations
 
 load_dotenv()
 
@@ -81,6 +82,7 @@ async def read_ingredients(
         - List of ingredients to avoid for skin type
         - List of harmful ingredients found with detailed reasons
         - Skin safety recommendation
+        - Content-based product recommendations (simplified)
     """
     try:
         if not file and not image_url:
@@ -100,7 +102,7 @@ async def read_ingredients(
             file_content = await file.read()
             # Pass bytes directly, not BytesIO
             extracted_text = extract_text_from_image(file_content, client)
-        else:
+        else:   
             # Get image from URL
             image_bytes = get_image_from_url(image_url)
             extracted_text = extract_text_from_image(image_bytes, client)
@@ -124,15 +126,93 @@ async def read_ingredients(
         # Create recommendation
         is_safe = len(harmful_ingredients) == 0
         
+        # Get content-based recommendations
+        try:
+            # Get recommendations based on detected ingredients
+            full_recommendations = get_skincare_recommendations(
+                input_ingredients=ingredients_list,
+                skin_type=skin_type,
+                top_k=5
+            )
+            
+            # Simplify recommendations to only include product_name and similarity_score
+            simplified_recommendations = []
+            for rec in full_recommendations.get('recommendations', []):
+                simplified_recommendations.append({
+                    'product_name': rec.get('product_name', 'Unknown'),
+                    'product_image': rec.get('product_image', 'Unknown'),
+                    'product_link': rec.get('product_link', 'Unknown'),
+                    'price': rec.get('price', 'Unknown'),
+                    'similarity_score': rec.get('similarity_score', 0.0)
+                })
+            
+            recommendations_result = {
+                'products': simplified_recommendations,
+                'recommendation_count': len(simplified_recommendations)
+            }
+            
+        except Exception as rec_error:
+            print(f"Recommendation error: {rec_error}")
+            recommendations_result = {
+                'recommendations': [],
+                'total_found': 0,
+                'total_safe': 0,
+                'recommendation_count': 0,
+                'error': str(rec_error)
+            }
+        
         return {
             "extracted_ingredients": ingredients_list,
             "harmful_ingredients_found": harmful_ingredients,
             "is_safe": is_safe,
             "total_harmful_ingredients": len(harmful_ingredients),
+            "recommendations": recommendations_result
         }
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing image: {str(e)}")
+
+# === New endpoint for getting recommendations only ===
+@app.post("/get-recommendations")
+async def get_recommendations_only(
+    skin_type: str = Body(...),
+    top_k: int = Body(default=10)
+):
+    """
+    Get skincare product recommendations based on skin type from product descriptions
+    
+    Parameters:
+        - skin_type: User's skin type
+        - top_k: Number of recommendations to return
+        
+    Returns:
+        - Products suitable for the specified skin type
+    """
+    try:
+        # Validate skin_type
+        valid_skin_types = ["oily", "dry", "normal", "acne", "sensitive"]
+        if skin_type not in valid_skin_types:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Skin type tidak valid. Pilihan yang tersedia: {', '.join(valid_skin_types)}"
+            )
+        
+        # Get recommendations based on skin type
+        from helper.recommendations import get_skin_type_recommendations
+        recommendations = get_skin_type_recommendations(
+            skin_type,
+            max(1, min(top_k, 20))
+        )
+        
+        return {
+            'recommendations': recommendations.get('recommendations', []),
+            'total_found': recommendations.get('total_found', 0),
+            'skin_type': skin_type,
+            'recommendation_count': recommendations.get('recommendation_count', 0)
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting recommendations: {str(e)}")
 
 # === Predict Endpoint ===
 @app.post("/predict-skin")
@@ -197,7 +277,7 @@ async def predict(
             raise HTTPException(
                 status_code=400,
                 detail=f"Face detection failed: {face_detection_result['reason']}. "
-                       "Please ensure the image contains a clear human face facing the camera."
+                        "Please ensure the image contains a clear human face facing the camera."
             )
         
         # Additional validation for face quality
@@ -205,7 +285,7 @@ async def predict(
             raise HTTPException(
                 status_code=400,
                 detail="Multiple faces detected in the image. "
-                       "Please use a photo with only one face."
+                        "Please use a photo with only one face."
             )
         
         # Validate face size and clarity
@@ -227,3 +307,17 @@ async def predict(
             status_code=500, 
             detail=f"Terjadi kesalahan dalam memproses gambar: {str(e)}"
         )
+        
+@app.get("/database/test")
+async def test_db_connection():
+    """Test MariaDB connection"""
+    try:
+        from utils.database import connect_to_db
+        result = connect_to_db()
+        
+        if not result:
+            raise HTTPException(status_code=500, detail="Gagal terhubung ke database.")
+        
+        return "cihuyy database udah nyambung"
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Connection test failed: {str(e)}")
