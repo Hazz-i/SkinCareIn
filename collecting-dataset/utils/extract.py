@@ -53,7 +53,7 @@ def get_all_product_links(driver, url):
     return list(all_links)
 
 def get_product_data(driver, url):
-    data = {'Title': None, 'Price': None, 'Description': None, 'Image URL': None, 'Link': url, 'Type': None}
+    data = {'Title': None, 'Price': None, 'Description': None, 'Image URL': None, 'Link': None, 'Type': None}
     wait = WebDriverWait(driver, 10)
     driver.get(url)
     time.sleep(2)
@@ -92,6 +92,41 @@ def get_product_data(driver, url):
         breadcrumbs = [el.text for el in breadcrumb_elements]
         data['Type'] = breadcrumbs
     except: pass
+    
+    try:
+        share_button = wait.until(EC.element_to_be_clickable(
+            (By.CSS_SELECTOR, 'button[data-testid="pdpShareButton"]')))
+        share_button.click()
+        time.sleep(1)
+        
+        # Cari semua button dengan kelas mOH6j3FxZNPpiZ6Kl2GyiA==
+        buttons = wait.until(EC.presence_of_all_elements_located(
+            (By.CSS_SELECTOR, 'div.mOH6j3FxZNPpiZ6Kl2GyiA\\=\\=')))
+        
+        # Pilih button urutan ke-6 (index 5)
+        if len(buttons) >= 6:
+            sixth_button = buttons[5]
+            driver.execute_script("arguments[0].click();", sixth_button)
+            time.sleep(2)  # Tunggu setelah klik button pertama
+            
+            # Cari dan klik element dengan kelas tmwUJHwvgxw6U3MxW1VE1A== di dalamnya
+            copy_element = wait.until(EC.element_to_be_clickable(
+                (By.CSS_SELECTOR, 'div.tmwUJHwvgxw6U3MxW1VE1A\\=\\=')))
+            copy_element = copy_element[5]
+            copy_element.click()
+            time.sleep(2)  # Tunggu sampai button diklik
+            
+            if copy_element.is_displayed():
+                meta_element = driver.find_element(By.CSS_SELECTOR, 'meta[property="og:image"]')
+                data['Link'] = meta_element.get_attribute("content")
+        else:
+            meta_element = driver.find_element(By.CSS_SELECTOR, 'meta[property="og:image"]')
+            data['Link'] = meta_element.get_attribute("content")
+    
+    except: 
+        meta_element = driver.find_element(By.CSS_SELECTOR, 'meta[property="og:image"]')
+        data['Link'] = meta_element.get_attribute("content")
+        
 
     return data
 

@@ -19,13 +19,13 @@ def main():
     }
     
     print("[1] Mulai proses ekstraksi...")
-    # extract_all_data('data', urls)
+    extract_all_data('data', urls)
 
-    print("[2] Transformasi data...")
-    data = transform_all_data()
+    # print("[2] Transformasi data...")
+    # data = transform_all_data()
 
-    print("[3] Load data ke dalam file CSV...")
-    store_to_csv(data, 'processed_data.csv')
+    # print("[3] Load data ke dalam file CSV...")
+    # store_to_csv(data, 'processed_data.csv')
 
 if __name__ == "__main__":
     main()
