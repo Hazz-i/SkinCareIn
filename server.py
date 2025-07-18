@@ -8,7 +8,6 @@ from pydantic import BaseModel
 from google import genai
 from enum import Enum
 import os
-import io
 
 from helper import (
     get_image_from_url, extract_text_from_image, 
