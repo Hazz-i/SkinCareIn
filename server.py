@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Body, File, UploadFile, Form
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from helper.educations import get_educations_list
 from helper.news import get_news, get_news_list
 from pydantic import BaseModel
 from google import genai
@@ -331,5 +332,16 @@ async def skincare_news_detail(request: dict = Body(...)):
         
         news = get_news(article_link)
         return JSONResponse(news)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/skincare-educations")
+async def skincare_educations(request: dict = Body(...)):
+    """Get skincare education articles"""
+    
+    try:
+        page = request.get("page", 1)
+        educations = get_educations_list(page_number=page)
+        return JSONResponse(educations)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

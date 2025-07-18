@@ -1,24 +1,55 @@
-import requests
+from helper import fetching_content
 from bs4 import BeautifulSoup
+import datetime
 
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36"
-    )
-}
-
-def fetching_content(url):
-    """Mengambil konten HTML dari URL yang diberikan."""
-    session = requests.Session()
+def parse_date_from_metadata(date):
+    """Extract and parse date from metadata list"""
+    if not date:
+        return date
     
-    try:
-        response = session.get(url, headers=HEADERS)
-        response.raise_for_status()  # Raise an exception for 4xx/5xx responses
-        return response.content
-    except requests.exceptions.RequestException as e:
-        print(f"Terjadi kesalahan ketika melakukan requests terhadap {url}: {e}")
-        return None
+    # Mapping bulan Indonesia ke English
+    month_mapping = {
+        'januari': 'January', 'februari': 'February', 'maret': 'March',
+        'april': 'April', 'mei': 'May', 'juni': 'June',
+        'juli': 'July', 'agustus': 'August', 'september': 'September',
+        'oktober': 'October', 'november': 'November', 'desember': 'December',
+        'jan': 'Jan', 'feb': 'Feb', 'mar': 'Mar', 'apr': 'Apr',
+        'jun': 'Jun', 'jul': 'Jul', 'agu': 'Aug', 'sep': 'Sep',
+        'okt': 'Oct', 'nov': 'Nov', 'des': 'Dec'
+    }
+    
+    # Convert Indonesian month names to English
+    date_english = date.lower()
+    for indo_month, eng_month in month_mapping.items():
+        date_english = date_english.replace(indo_month, eng_month)
+    
+    # Capitalize first letter of each word
+    date_english = ' '.join(word.capitalize() for word in date_english.split())
+    
+    # Daftar format tanggal yang mungkin
+    date_formats = [
+        '%d %B %Y',     # 27 July 2025
+        '%d %b %Y',     # 27 Jul 2025
+        '%d %B, %Y',    # 27 July, 2025
+        '%d %b, %Y',    # 27 Jul, 2025
+        '%B %d, %Y',    # July 27, 2025
+        '%b %d, %Y',    # Jul 27, 2025
+        '%Y-%m-%d',     # 2025-07-27
+        '%d/%m/%Y',     # 27/07/2025
+        '%m/%d/%Y',     # 07/27/2025
+    ]
+    
+    for date_format in date_formats:
+        try:
+            date_obj = datetime.datetime.strptime(date_english, date_format)
+            # Return in YYYY-MM-DD format
+            return date_obj.strftime('%Y-%m-%d')
+        except ValueError:
+            continue
+    
+    # Jika semua format gagal, return original date
+    print(f"Could not parse date: {date}")
+    return date
 
 def get_news_list(page=1):
     """Mengambil daftar berita dari URL yang diberikan."""
@@ -36,16 +67,21 @@ def get_news_list(page=1):
     page_elements = soup.find_all(attrs={'data-ci-pagination-page': True})
     page_number_list = []
 
-    for page in page_elements:
-        page_attr = page.get('data-ci-pagination-page')
+    for pages in page_elements:
+        page_attr = pages.get('data-ci-pagination-page')
         if page_attr and page_attr.isdigit():
             page_number_list.append(page_attr)
 
     # Mengurutkan dan mengonversi ke integer lalu kembali ke string untuk konsistensi
     page_number_list = sorted(set(page_number_list), key=int)
 
-    print(f"Jumlah halaman yang ditemukan: {page_number_list}")
-    print(f"Page numbers from data-ci-pagination-page: {page_number_list}")
+    paginations = {
+        'Current_Page': str(page),
+        'First_Page': str(page_number_list[0]) if page > 1 else None,
+        'Prev_Page': str(page - 1) if page > 1 else None,
+        'Next_Page': str(page + 1) if page < 70 else None,
+        'Last_Page': str(page_number_list[-1]) if page < 70 else None
+    }
 
     print(f"Jumlah artikel yang ditemukan: {len(article_elements)}")
 
@@ -75,13 +111,14 @@ def get_news_list(page=1):
             'Title': title,
             'Link': link,
             'Image': img,
-            'Date': date,
+            'Date': parse_date_from_metadata(date) if date else date,
             'Category': category
         })
         
+    
     data = {
-        'article_list': article_list,
-        'Page Numbers': page_number_list
+        'Article_List': article_list,
+        'Pagination': paginations
     }
         
     return data
@@ -151,7 +188,7 @@ def get_news(url):
         data.append({
             'Title': title,
             'ImageUrl': cover_image,
-            'Date': date,
+            'Date': parse_date_from_metadata(date),
             'Source': source,
             'Author': author,
             'Content': full_content,
@@ -203,7 +240,7 @@ def get_news(url):
         data.append({
             'Title': title,
             'ImageUrl': cover_image,
-            'Date': date,
+            'Date': parse_date_from_metadata(date),
             'Source': source,
             'Author': author,
             'Content': full_content,

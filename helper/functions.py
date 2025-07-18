@@ -525,3 +525,23 @@ def detect_face_in_image(image_bytes):
     """
     result = enhanced_face_detection(image_bytes)
     return result["has_face"] and result["is_clear"]
+
+# BeautifulSoup and requests setup
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36"
+    )
+}
+
+def fetching_content(url):
+    """Mengambil konten HTML dari URL yang diberikan."""
+    session = requests.Session()
+    
+    try:
+        response = session.get(url, headers=HEADERS)
+        response.raise_for_status()  # Raise an exception for 4xx/5xx responses
+        return response.content
+    except requests.exceptions.RequestException as e:
+        print(f"Terjadi kesalahan ketika melakukan requests terhadap {url}: {e}")
+        return None
