@@ -39,6 +39,56 @@ def parse_date_from_metadata(metadata_list):
     print(f"Could not parse date: {date_str}")
     return None
 
+def parse_date(date):
+    """Extract and parse date from metadata list"""
+    if not date:
+        return date
+    
+    # Mapping bulan Indonesia ke English
+    month_mapping = {
+        'januari': 'January', 'februari': 'February', 'maret': 'March',
+        'april': 'April', 'mei': 'May', 'juni': 'June',
+        'juli': 'July', 'agustus': 'August', 'september': 'September',
+        'oktober': 'October', 'november': 'November', 'desember': 'December',
+        'jan': 'Jan', 'feb': 'Feb', 'mar': 'Mar', 'apr': 'Apr',
+        'jun': 'Jun', 'jul': 'Jul', 'agu': 'Aug', 'sep': 'Sep',
+        'okt': 'Oct', 'nov': 'Nov', 'des': 'Dec'
+    }
+    
+    # Convert Indonesian month names to English
+    date_english = date.lower()
+    for indo_month, eng_month in month_mapping.items():
+        date_english = date_english.replace(indo_month, eng_month)
+    
+    # Capitalize first letter of each word
+    date_english = ' '.join(word.capitalize() for word in date_english.split())
+    
+    # Daftar format tanggal yang mungkin
+    date_formats = [
+        '%d %B %Y',     # 27 July 2025
+        '%d %b %Y',     # 27 Jul 2025
+        '%d %B, %Y',    # 27 July, 2025
+        '%d %b, %Y',    # 27 Jul, 2025
+        '%B %d, %Y',    # July 27, 2025
+        '%b %d, %Y',    # Jul 27, 2025
+        '%Y-%m-%d',     # 2025-07-27
+        '%d/%m/%Y',     # 27/07/2025
+        '%m/%d/%Y',     # 07/27/2025
+    ]
+    
+    for date_format in date_formats:
+        try:
+            date_obj = datetime.datetime.strptime(date_english, date_format)
+            # Return in YYYY-MM-DD format
+            return date_obj.strftime('%Y-%m-%d')
+        except ValueError:
+            continue
+    
+    # Jika semua format gagal, return original date
+    print(f"Could not parse date: {date}")
+    return date
+
+
 def create_search_url(base_url, date_obj, page_number=1, max_results=10):
     """Create search URL for pagination if needed"""
     if date_obj:
@@ -210,3 +260,114 @@ def get_educations_list(page_number=1):
     }
 
     return data
+
+def get_educations_details(url):
+    """Fungsi untuk mengambil detail pendidikan dari halaman utama."""
+    
+    content = fetching_content(url)
+    if not content:
+        print("Failed to fetch content. Stopping.")
+        return [], {}
+    
+    soup = BeautifulSoup(content, "html.parser")
+    title = soup.find('h1').text.strip() if soup.find('h1') else 'No Title Found'
+    author = soup.find('div', class_='me-3').text.strip() if soup.find('div', class_='me-3') else 'No Author Found'
+    date = soup.find('span', class_='date-format').text.strip() if soup.find('span', class_='date-format') else 'No Date Found'
+    imgUrl = soup.find_all('img')[1]['src'] if len(soup.find_all('img')) > 1 else 'No Image Found'
+    
+    content_div = soup.find('div', class_='entry-text text-break mb-5')
+    
+    if not content_div:
+        print("Content div not found!")
+        return [], {}
+    
+    # Function to convert content to markdown
+    def convert_to_markdown(element):
+        markdown_content = []
+        img_counter = 0  # Counter untuk melacak gambar
+        
+        for child in element.children:
+            if child.name == 'h1':
+                markdown_content.append(f"# {child.get_text(strip=True)}\n")
+            elif child.name == 'h2':
+                markdown_content.append(f"## {child.get_text(strip=True)}\n")
+            elif child.name == 'h3':
+                markdown_content.append(f"### {child.get_text(strip=True)}\n")
+            elif child.name == 'h4':
+                markdown_content.append(f"#### {child.get_text(strip=True)}\n")
+            elif child.name == 'h5':
+                markdown_content.append(f"##### {child.get_text(strip=True)}\n")
+            elif child.name == 'h6':
+                markdown_content.append(f"###### {child.get_text(strip=True)}\n")
+            elif child.name == 'p':
+                text = child.get_text(strip=True)
+                if text:
+                    markdown_content.append(f"{text}\n")
+            elif child.name == 'img':
+                img_counter += 1
+                if img_counter > 1:  # Skip first image
+                    img_src = child.get('src', '')
+                    img_alt = child.get('alt', '')
+                    if img_src:
+                        markdown_content.append(f"![{img_alt}]({img_src})\n")
+            elif child.name == 'blockquote':
+                text = child.get_text(strip=True)
+                if text:
+                    markdown_content.append(f"> {text}\n")
+            elif child.name == 'ul':
+                for li in child.find_all('li'):
+                    li_text = li.get_text(strip=True)
+                    if li_text:
+                        markdown_content.append(f"- {li_text}\n")
+            elif child.name == 'ol':
+                for i, li in enumerate(child.find_all('li'), 1):
+                    li_text = li.get_text(strip=True)
+                    if li_text:
+                        markdown_content.append(f"{i}. {li_text}\n")
+            elif child.name == 'div':
+                # Handle nested divs
+                div_text = child.get_text(strip=True)
+                if div_text:
+                    markdown_content.append(f"{div_text}\n")
+            elif child.name and child.get_text(strip=True):
+                # Handle other tags as plain text
+                text = child.get_text(strip=True)
+                markdown_content.append(f"{text}\n")
+            elif hasattr(child, 'strip'):
+                # Handle plain text nodes (NavigableString)
+                try:
+                    text = str(child).strip()
+                    if text:
+                        markdown_content.append(f"{text}\n")
+                except:
+                    pass
+        
+        return '\n'.join(markdown_content)
+    
+    # Convert content to markdown
+    markdown_text = convert_to_markdown(content_div)
+    
+    # Also extract all images separately for reference (skip first image)
+    all_images = content_div.find_all('img')
+    image_list = []
+    for i, img in enumerate(all_images):
+        if i == 0:  # Skip first image
+            continue
+        img_data = {
+            'src': img.get('src', ''),
+            'alt': img.get('alt', ''),
+            'title': img.get('title', '')
+        }
+        image_list.append(img_data)
+    
+    # Create final data structure
+    education_data = {
+        'Title': title,
+        'Author': author,
+        'Date': parse_date(date),
+        'Cover_Image': imgUrl,
+        'Content': markdown_text,
+        'Images': image_list,
+    }
+
+    return education_data

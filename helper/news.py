@@ -18,6 +18,10 @@ def parse_date_from_metadata(date):
         'okt': 'Oct', 'nov': 'Nov', 'des': 'Dec'
     }
     
+    # Handle format like "27/06/2021, 12:05 WIB" - extract only date part
+    if ',' in date and 'WIB' in date:
+        date = date.split(',')[0].strip()  # Get "27/06/2021"
+    
     # Convert Indonesian month names to English
     date_english = date.lower()
     for indo_month, eng_month in month_mapping.items():
@@ -28,6 +32,7 @@ def parse_date_from_metadata(date):
     
     # Daftar format tanggal yang mungkin
     date_formats = [
+        '%d/%m/%Y',     # 27/06/2021
         '%d %B %Y',     # 27 July 2025
         '%d %b %Y',     # 27 Jul 2025
         '%d %B, %Y',    # 27 July, 2025
@@ -35,8 +40,9 @@ def parse_date_from_metadata(date):
         '%B %d, %Y',    # July 27, 2025
         '%b %d, %Y',    # Jul 27, 2025
         '%Y-%m-%d',     # 2025-07-27
-        '%d/%m/%Y',     # 27/07/2025
-        '%m/%d/%Y',     # 07/27/2025
+        '%m/%d/%Y',     # 06/27/2021
+        '%d-%m-%Y',     # 27-06-2021
+        '%Y/%m/%d',     # 2021/06/27
     ]
     
     for date_format in date_formats:
@@ -134,7 +140,7 @@ def get_news(url):
     soup = BeautifulSoup(content, "html.parser")
     pagination = soup.find('div', class_='read__paging clearfix')
     
-    data = []
+    news_data = []
 
     if pagination:
         print("Pagination found.")
@@ -185,7 +191,7 @@ def get_news(url):
         # Content in Markdown format (only the content, not metadata)
         print(f"Number of paragraphs found: {len(content_text)}")
         
-        data.append({
+        news_data.append({
             'Title': title,
             'ImageUrl': cover_image,
             'Date': parse_date_from_metadata(date),
@@ -237,13 +243,13 @@ def get_news(url):
         # Content in Markdown format (only the content, not metadata)
         print(f"Number of paragraphs found: {len(content_text)}")
         
-        data.append({
+        news_data.append({
             'Title': title,
-            'ImageUrl': cover_image,
+            'Cover_Image': cover_image,
             'Date': parse_date_from_metadata(date),
             'Source': source,
             'Author': author,
             'Content': full_content,
         })
     
-    return data
+    return news_data

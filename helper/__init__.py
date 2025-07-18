@@ -10,7 +10,7 @@ from .functions import (
 )
 from .ingredients import ingredients_avoid_oily, ingredients_avoid_dry, ingredients_avoid_normal, ingredients_avoid_acne, ingredients_avoid_sensitive   
 from .news import get_news, get_news_list
-from .educations import get_educations_list
+from .educations import get_educations_list, get_educations_details
 
 __all__ = [
     # Image processing functions
@@ -51,5 +51,6 @@ __all__ = [
     'get_news_list'
     
     # Education functions
-    'get_educations_list'
+    'get_educations_list',
+    'get_educations_details'
 ]
