@@ -320,7 +320,7 @@ async def skincare_news(request: dict = Body(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-@app.post("/skincare-news-detail")
+@app.post("/skincare-news-details")
 async def skincare_news_detail(request: dict = Body(...)):
     """Get detailed skincare news article by link"""
 
