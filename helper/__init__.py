@@ -8,6 +8,7 @@ from .functions import (
     enhanced_face_detection
 )
 from .ingredients import ingredients_avoid_oily, ingredients_avoid_dry, ingredients_avoid_normal, ingredients_avoid_acne, ingredients_avoid_sensitive   
+from .news import get_news, get_news_list
 
 __all__ = [
     # Image processing functions
@@ -39,5 +40,9 @@ __all__ = [
     'ingredients_avoid_dry',
     'ingredients_avoid_normal',
     'ingredients_avoid_acne',
-    'ingredients_avoid_sensitive'
+    'ingredients_avoid_sensitive',
+    
+    # News functions
+    'get_news',
+    'get_news_list'
 ]

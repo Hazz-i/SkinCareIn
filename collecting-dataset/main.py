@@ -5,17 +5,17 @@ from utils import extract_all_data, transform_all_data, store_to_csv
 
 def main():
     urls = {
-        'somethinc' : "https://www.tokopedia.com/somethinc/product",
-        'scarlett' : "https://www.tokopedia.com/scarlettwhite/product",
-        'ms glow' : "https://www.tokopedia.com/msglowdistributorjkt/product",
-        'avoskin' : "https://www.tokopedia.com/avoskinbandung/product",
-        'whitelab' : "https://www.tokopedia.com/whitelab/product",
-        'azarine' : "https://www.tokopedia.com/azarinecosmetics/product",
+        # 'somethinc' : "https://www.tokopedia.com/somethinc/product",
+        # 'scarlett' : "https://www.tokopedia.com/scarlettwhite/product",
+        'ms glow' : "https://www.tokopedia.com/mglowofficialjkt/product",
+        # 'avoskin' : "https://www.tokopedia.com/avoskinbandung/product",
+        # 'whitelab' : "https://www.tokopedia.com/whitelab/product",
+        # 'azarine' : "https://www.tokopedia.com/azarinecosmetics/product",
         'wardah' : "https://www.tokopedia.com/wardah-official/product",
-        'erha'  : "https://www.tokopedia.com/erhaultimateofficial/product",
-        'emina' : "https://www.tokopedia.com/emina-official/product",
-        'bio beauty lab' : "https://www.tokopedia.com/biobeautylab/product",
-        'theoriginote': "https://www.tokopedia.com/theoriginote/product",
+        # 'erha'  : "https://www.tokopedia.com/erhaultimateofficial/product",
+        # 'emina' : "https://www.tokopedia.com/emina-official/product",
+        # 'bio beauty lab' : "https://www.tokopedia.com/biobeautylab/product",
+        # 'theoriginote': "https://www.tokopedia.com/theoriginote/product",
     }
     
     print("[1] Mulai proses ekstraksi...")

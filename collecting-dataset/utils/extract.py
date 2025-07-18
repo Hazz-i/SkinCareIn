@@ -55,8 +55,13 @@ def get_all_product_links(driver, url):
 def get_product_data(driver, url):
     data = {'Title': None, 'Price': None, 'Description': None, 'Image URL': None, 'Link': None, 'Type': None}
     wait = WebDriverWait(driver, 10)
-    driver.get(url)
-    time.sleep(2)
+    
+    try:
+        driver.get(url)
+        time.sleep(2)
+    except Exception as e:
+        print(f"[❌] Gagal mengakses URL: {url} - Error: {str(e)}")
+        return None
 
     try:
         data['Title'] = wait.until(EC.presence_of_element_located(
@@ -141,17 +146,38 @@ def extract_all_data(output_folder='raw_data', urls = None):
         print(f"[✓] Ditemukan {len(product_links)} produk")
 
         raw_data = []
+        successful_scrapes = 0
+        failed_scrapes = 0
+        
         for i, link in enumerate(product_links):
-            print(f"[{i+1}] Ambil data dari: {link}")
-            data = get_product_data(driver, link)
-            data['Brand'] = brand
-            raw_data.append(data)
+            print(f"[{i+1}/{len(product_links)}] Ambil data dari: {link}")
+            try:
+                data = get_product_data(driver, link)
+                if data is not None:  # Jika berhasil mengakses link
+                    data['Brand'] = brand
+                    raw_data.append(data)
+                    successful_scrapes += 1
+                    print(f"[✓] Berhasil mengambil data produk")
+                else:  # Jika gagal mengakses link
+                    failed_scrapes += 1
+                    print(f"[⚠] Link dilewati karena tidak dapat diakses")
+            except Exception as e:
+                failed_scrapes += 1
+                print(f"[❌] Error saat scraping: {str(e)}")
+                print(f"[⚠] Melanjutkan ke link berikutnya...")
+                continue
+            
             time.sleep(1)
+        
+        print(f"[📊] Ringkasan: {successful_scrapes} berhasil, {failed_scrapes} gagal dari {len(product_links)} total link")
 
         # Simpan hasil mentah per brand
-        df_raw = pd.DataFrame(raw_data)
-        df_raw.to_csv(f"{output_folder}/raw_{brand}.csv", index=False)
-        print(f"[💾] Data mentah disimpan di: {output_folder}/raw_{brand}.csv")
+        if raw_data:  # Hanya simpan jika ada data yang berhasil di-scrape
+            df_raw = pd.DataFrame(raw_data)
+            df_raw.to_csv(f"{output_folder}/raw_{brand}.csv", index=False)
+            print(f"[💾] Data mentah disimpan di: {output_folder}/raw_{brand}.csv")
+        else:
+            print(f"[⚠] Tidak ada data yang berhasil di-scrape untuk brand {brand}")
 
     driver.quit()
     print("[✔] Semua brand selesai diproses.")

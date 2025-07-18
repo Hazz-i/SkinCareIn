@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Body, File, UploadFile, Form
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from helper.news import get_news, get_news_list
 from pydantic import BaseModel
 from google import genai
 from enum import Enum
@@ -308,16 +309,27 @@ async def predict(
             detail=f"Terjadi kesalahan dalam memproses gambar: {str(e)}"
         )
         
-@app.get("/database/test")
-async def test_db_connection():
-    """Test MariaDB connection"""
+@app.post("/skincare-news")
+async def skincare_news(request: dict = Body(...)):
+    """Get skincare news articles"""
+    
     try:
-        from utils.database import connect_to_db
-        result = connect_to_db()
-        
-        if not result:
-            raise HTTPException(status_code=500, detail="Gagal terhubung ke database.")
-        
-        return "cihuyy database udah nyambung"
+        page = request.get("page", 1)
+        news = get_news_list(page=page)
+        return JSONResponse(news)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Connection test failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/skincare-news-detail")
+async def skincare_news_detail(request: dict = Body(...)):
+    """Get detailed skincare news article by link"""
+
+    try:
+        article_link = request.get("article_link")
+        if not article_link:
+            raise HTTPException(status_code=400, detail="article_link is required")
+        
+        news = get_news(article_link)
+        return JSONResponse(news)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
