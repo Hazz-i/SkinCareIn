@@ -168,28 +168,41 @@ def get_news(url):
         author = soup.find('div', class_='credit-title-nameEditor').text.strip()
         
         content_elements = soup.find('div', class_='read__content')
-        content_paragraphs = content_elements.find_all('p') 
-        if not content_paragraphs:
-            print("No paragraphs found in content.")
+        content_elements_list = content_elements.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']) 
+        if not content_elements_list:
+            print("No content elements found.")
 
-        # Extract text from all paragraph elements and format as Markdown
+        # Extract text from all paragraph and heading elements and format as Markdown
         content_text = []
-        for p in content_paragraphs:
-            # Remove any img tags from the paragraph
-            for img in p.find_all('img'):
+        for element in content_elements_list:
+            # Remove any img tags from the element
+            for img in element.find_all('img'):
                 img.decompose()
             
             # Get text content and strip whitespace
-            text = p.get_text(strip=True)
-            if text:  # Only add non-empty text
-                # Format as Markdown paragraph
-                content_text.append(text)
+            text = element.get_text(strip=True)
+            if text and 'baca juga' not in text.lower():  # Only add non-empty text and skip "baca juga"
+                # Format as Markdown based on tag type
+                if element.name == 'h1':
+                    content_text.append(f"# {text}")
+                elif element.name == 'h2':
+                    content_text.append(f"## {text}")
+                elif element.name == 'h3':
+                    content_text.append(f"### {text}")
+                elif element.name == 'h4':
+                    content_text.append(f"#### {text}")
+                elif element.name == 'h5':
+                    content_text.append(f"##### {text}")
+                elif element.name == 'h6':
+                    content_text.append(f"###### {text}")
+                else:  # p tag
+                    content_text.append(text)
         
         # Join all paragraphs with double line breaks for Markdown formatting
         full_content = '\n\n'.join(content_text)
         
         # Content in Markdown format (only the content, not metadata)
-        print(f"Number of paragraphs found: {len(content_text)}")
+        print(f"Number of content elements found: {len(content_text)}")
         
         news_data.append({
             'Title': title,
@@ -220,28 +233,41 @@ def get_news(url):
         author = soup.find('div', class_='credit-title-nameEditor').text.strip()
         
         content_elements = soup.find('div', class_='read__content')
-        content_paragraphs = content_elements.find_all('p') 
-        if not content_paragraphs:
-            print("No paragraphs found in content.")
+        content_elements_list = content_elements.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']) 
+        if not content_elements_list:
+            print("No content elements found.")
 
-        # Extract text from all paragraph elements and format as Markdown
+        # Extract text from all paragraph and heading elements and format as Markdown
         content_text = []
-        for p in content_paragraphs:
-            # Remove any img tags from the paragraph
-            for img in p.find_all('img'):
+        for element in content_elements_list:
+            # Remove any img tags from the element
+            for img in element.find_all('img'):
                 img.decompose()
             
             # Get text content and strip whitespace
-            text = p.get_text(strip=True)
-            if text:  # Only add non-empty text
-                # Format as Markdown paragraph
-                content_text.append(text)
+            text = element.get_text(strip=True)
+            if text and 'baca juga' not in text.lower():  # Only add non-empty text and skip "baca juga"
+                # Format as Markdown based on tag type
+                if element.name == 'h1':
+                    content_text.append(f"# {text}")
+                elif element.name == 'h2':
+                    content_text.append(f"## {text}")
+                elif element.name == 'h3':
+                    content_text.append(f"### {text}")
+                elif element.name == 'h4':
+                    content_text.append(f"#### {text}")
+                elif element.name == 'h5':
+                    content_text.append(f"##### {text}")
+                elif element.name == 'h6':
+                    content_text.append(f"###### {text}")
+                else:  # p tag
+                    content_text.append(text)
         
         # Join all paragraphs with double line breaks for Markdown formatting
         full_content = '\n\n'.join(content_text)
         
         # Content in Markdown format (only the content, not metadata)
-        print(f"Number of paragraphs found: {len(content_text)}")
+        print(f"Number of content elements found: {len(content_text)}")
         
         news_data.append({
             'Title': title,
