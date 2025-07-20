@@ -340,7 +340,10 @@ async def skincare_educations(request: dict = Body(...)):
     
     try:
         page = request.get("page", 1)
-        educations = get_educations_list(page_number=page)
+        link = request.get("link", "https://www.eduskincare.eu.org/")
+        prev_link = request.get("prev_link", None)  # Link sebelumnya untuk pagination
+        
+        educations = get_educations_list(page_number=page, url=link, prev_link=prev_link)
         return JSONResponse(educations)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -98,7 +98,7 @@ def create_search_url(base_url, date_obj, page_number=1, max_results=10):
         # Fallback URL tanpa filter tanggal
         return f'{base_url}search?max-results={max_results}&page={page_number}'
 
-def generate_pagination_links(base_url, posts_data, current_page=1, max_results=10):
+def generate_pagination_links(base_url, posts_data, current_page=1, max_results=10, prev_link=None):
     """Generate next and prev pagination links based on posts data"""
     pagination_info = {
         'Current_Page': str(current_page),
@@ -121,23 +121,21 @@ def generate_pagination_links(base_url, posts_data, current_page=1, max_results=
         except ValueError:
             pass
     
-    # Prev Link: menggunakan tanggal dari post pertama ([0])
+    # Prev Link: menggunakan prev_link yang disimpan atau current_link sebagai fallback
     if pagination_info['Prev_Page']:
-        first_post = posts_data[0]
-        if first_post.get('Date'):
-            try:
-                prev_link = f'{base_url}search?updated-max={first_post["Date"]}T18:26:00%2B07:00&max-results={max_results}&page={pagination_info["Prev_Page"]}'
-                pagination_info['Prev_Link'] = prev_link
-            except ValueError:
-                pass
-    
+        if prev_link:
+            # Gunakan prev_link yang disimpan dari request sebelumnya
+            pagination_info['Prev_Link'] = prev_link
+        else:
+            pagination_info['Prev_Link'] = None
+
     return pagination_info
 
-def get_educations_list(page_number=1):
+def get_educations_list(page_number=1, url="https://www.eduskincare.eu.org/", prev_link=None):
     """Fungsi utama untuk keseluruhan proses scraping, transformasi data, dan penyimpanan."""
     BASE_URL = 'https://www.eduskincare.eu.org/'
-    
-    content = fetching_content(BASE_URL)
+
+    content = fetching_content(url)
     if not content:
         print("Failed to fetch content. Stopping.")
         return [], {}
@@ -206,8 +204,10 @@ def get_educations_list(page_number=1):
 
         for article in articles:
             try:
-                title = article.find('h3').text.strip() if article.find('h3') else ''
-                link_element = article.find('h3').find('a') if article.find('h3') else None
+                # Extract title and link - try h3 first, then h2
+                title_element = article.find('h3') or article.find('h2')
+                title = title_element.text.strip() if title_element else ''
+                link_element = title_element.find('a') if title_element else None
                 link = link_element['href'] if link_element else ''
                 
                 # Extract image
@@ -252,7 +252,10 @@ def get_educations_list(page_number=1):
         return [], {}
 
     # Generate pagination links
-    pagination = generate_pagination_links(BASE_URL, all_posts_data, page_number, max_results=10)
+    pagination = generate_pagination_links(BASE_URL, all_posts_data, page_number, max_results=10, prev_link=prev_link)
+    
+    # Tambahkan current_link ke pagination untuk disimpan di client
+    pagination['Current_Link'] = url
     
     data = {
         "Educations_List": all_posts_data,
@@ -284,81 +287,207 @@ def get_educations_details(url):
     # Function to convert content to markdown
     def convert_to_markdown(element):
         markdown_content = []
-        img_counter = 0  # Counter untuk melacak gambar
         
+        def extract_images_from_element(elem):
+            """Extract all images from an element and its children"""
+            images = []
+            # Find all img tags in the element
+            for img in elem.find_all('img'):
+                img_src = img.get('src', '')
+                img_alt = img.get('alt', '')
+                img_title = img.get('title', '')
+                
+                if img_src:
+                    img_attributes = f'src="{img_src}"'
+                    if img_alt:
+                        img_attributes += f' alt="{img_alt}"'
+                    if img_title:
+                        img_attributes += f' title="{img_title}"'
+                    images.append(f'<img {img_attributes}>')
+            return images
+        
+        def process_element(elem):
+            """Recursively process HTML elements and their children"""
+            if elem.name == 'h1':
+                return f"# {elem.get_text(strip=True)}\n\n"
+            elif elem.name == 'h2':
+                return f"## {elem.get_text(strip=True)}\n\n"
+            elif elem.name == 'h3':
+                return f"### {elem.get_text(strip=True)}\n\n"
+            elif elem.name == 'h4':
+                return f"#### {elem.get_text(strip=True)}\n\n"
+            elif elem.name == 'h5':
+                return f"##### {elem.get_text(strip=True)}\n\n"
+            elif elem.name == 'h6':
+                return f"###### {elem.get_text(strip=True)}\n\n"
+            elif elem.name == 'p':
+                # Handle paragraphs that might contain images or other elements
+                p_content = []
+                
+                # First, check if there are any images in this paragraph
+                images = extract_images_from_element(elem)
+                if images:
+                    # If there are images, include them
+                    p_content.extend(images)
+                
+                # Get text content, excluding image tags
+                text_content = []
+                for child in elem.children:
+                    if child.name != 'img' and hasattr(child, 'get_text'):
+                        text = child.get_text(strip=True)
+                        if text:
+                            text_content.append(text)
+                    elif hasattr(child, 'strip') and child.name != 'img':
+                        text = str(child).strip()
+                        if text:
+                            text_content.append(text)
+                
+                # Add text content if any
+                if text_content:
+                    p_content.append(' '.join(text_content))
+                
+                if p_content:
+                    return '\n'.join(p_content) + '\n\n'
+                return ''
+            elif elem.name == 'img':
+                # Handle standalone images
+                img_src = elem.get('src', '')
+                img_alt = elem.get('alt', '')
+                img_title = elem.get('title', '')
+                
+                if img_src:
+                    img_attributes = f'src="{img_src}"'
+                    if img_alt:
+                        img_attributes += f' alt="{img_alt}"'
+                    if img_title:
+                        img_attributes += f' title="{img_title}"'
+                    return f'<img {img_attributes}>\n\n'
+                return ''
+            elif elem.name == 'blockquote':
+                text = elem.get_text(strip=True)
+                if text:
+                    return f"> {text}\n\n"
+                return ''
+            elif elem.name == 'ul':
+                ul_content = []
+                for li in elem.find_all('li', recursive=False):
+                    li_text = li.get_text(strip=True)
+                    if li_text:
+                        ul_content.append(f"- {li_text}")
+                return '\n'.join(ul_content) + '\n\n' if ul_content else ''
+            elif elem.name == 'ol':
+                ol_content = []
+                for i, li in enumerate(elem.find_all('li', recursive=False), 1):
+                    li_text = li.get_text(strip=True)
+                    if li_text:
+                        ol_content.append(f"{i}. {li_text}")
+                return '\n'.join(ol_content) + '\n\n' if ol_content else ''
+            elif elem.name == 'table':
+                # Handle tables
+                table_content = []
+                
+                # Process table headers
+                thead = elem.find('thead')
+                if thead:
+                    header_row = thead.find('tr')
+                    if header_row:
+                        headers = []
+                        for th in header_row.find_all(['th', 'td']):
+                            # Check for images in header cells
+                            cell_images = extract_images_from_element(th)
+                            if cell_images:
+                                headers.append(' '.join(cell_images))
+                            else:
+                                headers.append(th.get_text(strip=True))
+                        
+                        if headers:
+                            table_content.append('| ' + ' | '.join(headers) + ' |')
+                            table_content.append('|' + '---|' * len(headers))
+                
+                # Process table body
+                tbody = elem.find('tbody') or elem
+                for row in tbody.find_all('tr'):
+                    cells = []
+                    for cell in row.find_all(['td', 'th']):
+                        # Check for images in this cell
+                        cell_images = extract_images_from_element(cell)
+                        if cell_images:
+                            # If there are images, use them
+                            cells.append(' '.join(cell_images))
+                        else:
+                            # Otherwise use text content
+                            cells.append(cell.get_text(strip=True))
+                    
+                    if cells:
+                        table_content.append('| ' + ' | '.join(cells) + ' |')
+                
+                return '\n'.join(table_content) + '\n\n' if table_content else ''
+            elif elem.name == 'div':
+                # Handle divs recursively
+                div_content = []
+                
+                # First check if this div directly contains images
+                direct_images = extract_images_from_element(elem)
+                if direct_images:
+                    div_content.extend(direct_images)
+                
+                # Then process child elements
+                for child in elem.children:
+                    if child.name:
+                        processed = process_element(child)
+                        if processed:
+                            div_content.append(processed)
+                    elif hasattr(child, 'strip'):
+                        text = str(child).strip()
+                        if text and not text.startswith('<'):  # Avoid duplicate HTML
+                            div_content.append(text + '\n')
+                
+                return '\n'.join(div_content) if div_content else ''
+            else:
+                # Handle other elements - check for images first
+                images = extract_images_from_element(elem)
+                if images:
+                    result = '\n'.join(images) + '\n'
+                    text = elem.get_text(strip=True)
+                    if text:
+                        result += text + '\n'
+                    return result
+                else:
+                    text = elem.get_text(strip=True)
+                    if text:
+                        return text + '\n'
+                    return ''
+        
+        # Process all children of the main element
         for child in element.children:
-            if child.name == 'h1':
-                markdown_content.append(f"# {child.get_text(strip=True)}\n")
-            elif child.name == 'h2':
-                markdown_content.append(f"## {child.get_text(strip=True)}\n")
-            elif child.name == 'h3':
-                markdown_content.append(f"### {child.get_text(strip=True)}\n")
-            elif child.name == 'h4':
-                markdown_content.append(f"#### {child.get_text(strip=True)}\n")
-            elif child.name == 'h5':
-                markdown_content.append(f"##### {child.get_text(strip=True)}\n")
-            elif child.name == 'h6':
-                markdown_content.append(f"###### {child.get_text(strip=True)}\n")
-            elif child.name == 'p':
-                text = child.get_text(strip=True)
-                if text:
-                    markdown_content.append(f"{text}\n")
-            elif child.name == 'img':
-                img_counter += 1
-                if img_counter > 1:  # Skip first image
-                    img_src = child.get('src', '')
-                    img_alt = child.get('alt', '')
-                    if img_src:
-                        markdown_content.append(f"![{img_alt}]({img_src})\n")
-            elif child.name == 'blockquote':
-                text = child.get_text(strip=True)
-                if text:
-                    markdown_content.append(f"> {text}\n")
-            elif child.name == 'ul':
-                for li in child.find_all('li'):
-                    li_text = li.get_text(strip=True)
-                    if li_text:
-                        markdown_content.append(f"- {li_text}\n")
-            elif child.name == 'ol':
-                for i, li in enumerate(child.find_all('li'), 1):
-                    li_text = li.get_text(strip=True)
-                    if li_text:
-                        markdown_content.append(f"{i}. {li_text}\n")
-            elif child.name == 'div':
-                # Handle nested divs
-                div_text = child.get_text(strip=True)
-                if div_text:
-                    markdown_content.append(f"{div_text}\n")
-            elif child.name and child.get_text(strip=True):
-                # Handle other tags as plain text
-                text = child.get_text(strip=True)
-                markdown_content.append(f"{text}\n")
+            if child.name:
+                processed = process_element(child)
+                if processed:
+                    markdown_content.append(processed)
             elif hasattr(child, 'strip'):
                 # Handle plain text nodes (NavigableString)
                 try:
                     text = str(child).strip()
-                    if text:
-                        markdown_content.append(f"{text}\n")
+                    if text and not text.startswith('<'):  # Avoid duplicate HTML
+                        markdown_content.append(text + '\n')
                 except:
                     pass
         
-        return '\n'.join(markdown_content)
+        # Also check for any images that might have been missed at the top level
+        top_level_images = extract_images_from_element(element)
+        if top_level_images and not any('<img' in content for content in markdown_content):
+            markdown_content.extend([img + '\n' for img in top_level_images])
+        
+        return ''.join(markdown_content)
     
     # Convert content to markdown
     markdown_text = convert_to_markdown(content_div)
     
-    # Also extract all images separately for reference (skip first image)
-    all_images = content_div.find_all('img')
-    image_list = []
+    # Debug: Check if any images were found in the entire content
+    all_images = content_div.find_all('img') if content_div else []
+    print(f"Debug: Found {len(all_images)} images in content")
     for i, img in enumerate(all_images):
-        if i == 0:  # Skip first image
-            continue
-        img_data = {
-            'src': img.get('src', ''),
-            'alt': img.get('alt', ''),
-            'title': img.get('title', '')
-        }
-        image_list.append(img_data)
+        print(f"Debug: Image {i+1}: src='{img.get('src', '')}', alt='{img.get('alt', '')}'")
     
     # Create final data structure
     education_data = {
@@ -367,7 +496,6 @@ def get_educations_details(url):
         'Date': parse_date(date),
         'Cover_Image': imgUrl,
         'Content': markdown_text,
-        'Images': image_list,
     }
 
     return education_data
