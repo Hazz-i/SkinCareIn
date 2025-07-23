@@ -54,7 +54,7 @@ def extract_text_from_image(image_bytes: bytes, client) -> str:
                         "data": base64_image,
                     }
                 },
-                "baca teks yang ada dalam gambar ini"
+                "cari ingredients/bahan/komposisi dalam gambar ini dan berikan hasilnya dalam format teks biasa tanpa markdown atau formatting lainnya. buang teks yang tidak relevan seperti nama brand, nama produk, atau informasi lain yang tidak berkaitan dengan bahan, serta jika tidak terdapat ingredients sama sekali, tampilkan ingredients not found.",
             ],
         )
         return response.text

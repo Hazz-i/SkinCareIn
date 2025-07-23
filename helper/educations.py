@@ -287,6 +287,8 @@ def get_educations_details(url):
     # Function to convert content to markdown
     def convert_to_markdown(element):
         markdown_content = []
+        first_image_removed = False
+        first_heading_removed = False
         
         def extract_images_from_element(elem):
             """Extract all images from an element and its children"""
@@ -308,18 +310,27 @@ def get_educations_details(url):
         
         def process_element(elem):
             """Recursively process HTML elements and their children"""
-            if elem.name == 'h1':
-                return f"# {elem.get_text(strip=True)}\n\n"
-            elif elem.name == 'h2':
-                return f"## {elem.get_text(strip=True)}\n\n"
-            elif elem.name == 'h3':
-                return f"### {elem.get_text(strip=True)}\n\n"
-            elif elem.name == 'h4':
-                return f"#### {elem.get_text(strip=True)}\n\n"
-            elif elem.name == 'h5':
-                return f"##### {elem.get_text(strip=True)}\n\n"
-            elif elem.name == 'h6':
-                return f"###### {elem.get_text(strip=True)}\n\n"
+            nonlocal first_image_removed, first_heading_removed
+            
+            if elem.name in ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+                # Skip the first heading
+                if not first_heading_removed:
+                    first_heading_removed = True
+                    return ''
+                
+                # Process remaining headings
+                if elem.name == 'h1':
+                    return f"# {elem.get_text(strip=True)}\n\n"
+                elif elem.name == 'h2':
+                    return f"## {elem.get_text(strip=True)}\n\n"
+                elif elem.name == 'h3':
+                    return f"### {elem.get_text(strip=True)}\n\n"
+                elif elem.name == 'h4':
+                    return f"#### {elem.get_text(strip=True)}\n\n"
+                elif elem.name == 'h5':
+                    return f"##### {elem.get_text(strip=True)}\n\n"
+                elif elem.name == 'h6':
+                    return f"###### {elem.get_text(strip=True)}\n\n"
             elif elem.name == 'p':
                 # Handle paragraphs that might contain images or other elements
                 p_content = []
@@ -327,8 +338,15 @@ def get_educations_details(url):
                 # First, check if there are any images in this paragraph
                 images = extract_images_from_element(elem)
                 if images:
-                    # If there are images, include them
-                    p_content.extend(images)
+                    # Skip the first image if not yet removed
+                    if not first_image_removed:
+                        first_image_removed = True
+                        # Remove the first image from the list
+                        images = images[1:] if len(images) > 1 else []
+                    
+                    # Add remaining images if any
+                    if images:
+                        p_content.extend(images)
                 
                 # Get text content, excluding image tags
                 text_content = []
@@ -350,7 +368,11 @@ def get_educations_details(url):
                     return '\n'.join(p_content) + '\n\n'
                 return ''
             elif elem.name == 'img':
-                # Handle standalone images
+                # Handle standalone images - skip the first one
+                if not first_image_removed:
+                    first_image_removed = True
+                    return ''
+                
                 img_src = elem.get('src', '')
                 img_alt = elem.get('alt', '')
                 img_title = elem.get('title', '')
@@ -396,7 +418,15 @@ def get_educations_details(url):
                             # Check for images in header cells
                             cell_images = extract_images_from_element(th)
                             if cell_images:
-                                headers.append(' '.join(cell_images))
+                                # Handle first image removal in table cells
+                                if not first_image_removed and cell_images:
+                                    first_image_removed = True
+                                    cell_images = cell_images[1:] if len(cell_images) > 1 else []
+                                
+                                if cell_images:
+                                    headers.append(' '.join(cell_images))
+                                else:
+                                    headers.append(th.get_text(strip=True))
                             else:
                                 headers.append(th.get_text(strip=True))
                         
@@ -412,8 +442,15 @@ def get_educations_details(url):
                         # Check for images in this cell
                         cell_images = extract_images_from_element(cell)
                         if cell_images:
-                            # If there are images, use them
-                            cells.append(' '.join(cell_images))
+                            # Handle first image removal in table cells
+                            if not first_image_removed and cell_images:
+                                first_image_removed = True
+                                cell_images = cell_images[1:] if len(cell_images) > 1 else []
+                            
+                            if cell_images:
+                                cells.append(' '.join(cell_images))
+                            else:
+                                cells.append(cell.get_text(strip=True))
                         else:
                             # Otherwise use text content
                             cells.append(cell.get_text(strip=True))
@@ -429,7 +466,13 @@ def get_educations_details(url):
                 # First check if this div directly contains images
                 direct_images = extract_images_from_element(elem)
                 if direct_images:
-                    div_content.extend(direct_images)
+                    # Handle first image removal
+                    if not first_image_removed and direct_images:
+                        first_image_removed = True
+                        direct_images = direct_images[1:] if len(direct_images) > 1 else []
+                    
+                    if direct_images:
+                        div_content.extend(direct_images)
                 
                 # Then process child elements
                 for child in elem.children:
@@ -447,7 +490,15 @@ def get_educations_details(url):
                 # Handle other elements - check for images first
                 images = extract_images_from_element(elem)
                 if images:
-                    result = '\n'.join(images) + '\n'
+                    # Handle first image removal
+                    if not first_image_removed and images:
+                        first_image_removed = True
+                        images = images[1:] if len(images) > 1 else []
+                    
+                    result = ''
+                    if images:
+                        result = '\n'.join(images) + '\n'
+                    
                     text = elem.get_text(strip=True)
                     if text:
                         result += text + '\n'
@@ -472,11 +523,6 @@ def get_educations_details(url):
                         markdown_content.append(text + '\n')
                 except:
                     pass
-        
-        # Also check for any images that might have been missed at the top level
-        top_level_images = extract_images_from_element(element)
-        if top_level_images and not any('<img' in content for content in markdown_content):
-            markdown_content.extend([img + '\n' for img in top_level_images])
         
         return ''.join(markdown_content)
     

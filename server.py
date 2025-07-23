@@ -113,44 +113,56 @@ async def read_ingredients(
         
         # Clean and extract ingredients section
         extracted_text = clean_extracted_text(extracted_text)
-        ingredients_text = extract_ingredients_section(extracted_text)
+        # ingredients_text = extract_ingredients_section(extracted_text)
         
         # Parse ingredients into list
-        ingredients_list = parse_ingredients_to_list(ingredients_text)
+        ingredients_list = parse_ingredients_to_list(extracted_text)
         
         # Get ingredients to avoid based on skin type
         avoid_list = get_ingredients_to_avoid(skin_type)
         
         # Find harmful ingredients with detailed explanations
-        harmful_ingredients = find_harmful_ingredients_with_details(ingredients_text, avoid_list, skin_type)
-        
+        harmful_ingredients = find_harmful_ingredients_with_details(extracted_text, avoid_list, skin_type)
+
         # Create recommendation
         is_safe = len(harmful_ingredients) == 0
         
         # Get content-based recommendations
         try:
-            # Get recommendations based on detected ingredients
-            full_recommendations = get_skincare_recommendations(
-                input_ingredients=ingredients_list,
-                skin_type=skin_type,
-                top_k=5
-            )
-            
-            # Simplify recommendations to only include product_name and similarity_score
-            simplified_recommendations = []
-            for rec in full_recommendations.get('recommendations', []):
-                simplified_recommendations.append({
-                    'product_name': rec.get('product_name', 'Unknown'),
-                    'product_image': rec.get('product_image', 'Unknown'),
-                    'product_link': rec.get('product_link', 'Unknown'),
-                    'price': rec.get('price', 'Unknown'),
-                    'similarity_score': rec.get('similarity_score', 0.0)
-                })
-            
-            recommendations_result = {
-                'products': simplified_recommendations,
-                'recommendation_count': len(simplified_recommendations)
-            }
+            if extracted_text == 'ingredients not found':
+                recommendations_result = {
+                    "extracted_ingredients": 'ingredients not found',
+                    "harmful_ingredients_found": 0,
+                    "is_safe": False,
+                    "total_harmful_ingredients": 0,
+                    "recommendations": "No recommendations available due to missing ingredients."
+                }
+                
+                
+                return recommendations_result
+            else:
+                # Get recommendations based on detected ingredients
+                full_recommendations = get_skincare_recommendations(
+                    input_ingredients=ingredients_list,
+                    skin_type=skin_type,
+                    top_k=5
+                )
+                
+                # Simplify recommendations to only include product_name and similarity_score
+                simplified_recommendations = []
+                for rec in full_recommendations.get('recommendations', []):
+                    simplified_recommendations.append({
+                        'product_name': rec.get('product_name', 'Unknown'),
+                        'product_image': rec.get('product_image', 'Unknown'),
+                        'product_link': rec.get('product_link', 'Unknown'),
+                        'price': rec.get('price', 'Unknown'),
+                        'similarity_score': rec.get('similarity_score', 0.0)
+                    })
+                
+                recommendations_result = {
+                    'products': simplified_recommendations,
+                    'recommendation_count': len(simplified_recommendations)
+                }
             
         except Exception as rec_error:
             print(f"Recommendation error: {rec_error}")
