@@ -13,7 +13,7 @@ from helper import (
     get_image_from_url, extract_text_from_image, 
     clean_extracted_text, extract_ingredients_section, find_harmful_ingredients_with_details, 
     parse_ingredients_to_list, get_ingredients_to_avoid, load_resnet_skin_classifier, 
-    get_skin_type_label_mapping, predict_skin_type_from_image, enhanced_face_detection
+    get_skin_type_label_mapping, predict_skin_type_from_image
 )
 
 from helper.recommendations import get_skincare_recommendations
@@ -283,30 +283,30 @@ async def predict(
                     detail=f"Gagal mengambil gambar dari URL: {str(e)}"
                 )
         
-        # Enhanced face detection with multiple validations
-        face_detection_result = enhanced_face_detection(image_bytes)
+        # # Enhanced face detection with multiple validations
+        # face_detection_result = enhanced_face_detection(image_bytes)
         
-        if not face_detection_result["has_face"]:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Face detection failed: {face_detection_result['reason']}. "
-                        "Please ensure the image contains a clear human face facing the camera."
-            )
+        # if not face_detection_result["has_face"]:
+        #     raise HTTPException(
+        #         status_code=400,
+        #         detail=f"Face detection failed: {face_detection_result['reason']}. "
+        #                 "Please ensure the image contains a clear human face facing the camera."
+        #     )
         
-        # Additional validation for face quality
-        if face_detection_result["face_count"] > 1:
-            raise HTTPException(
-                status_code=400,
-                detail="Multiple faces detected in the image. "
-                        "Please use a photo with only one face."
-            )
+        # # Additional validation for face quality
+        # if face_detection_result["face_count"] > 1:
+        #     raise HTTPException(
+        #         status_code=400,
+        #         detail="Multiple faces detected in the image. "
+        #                 "Please use a photo with only one face."
+        #     )
         
-        # Validate face size and clarity
-        if not face_detection_result["is_clear"]:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Face quality insufficient: {face_detection_result['reason']}"
-            )
+        # # Validate face size and clarity
+        # if not face_detection_result["is_clear"]:
+        #     raise HTTPException(
+        #         status_code=400,
+        #         detail=f"Face quality insufficient: {face_detection_result['reason']}"
+        #     )
         
         # Pass bytes directly for skin type prediction
         result = predict_skin_type_from_image(image_bytes, model, transform, index_label)
