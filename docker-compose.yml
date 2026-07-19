@@ -6,7 +6,7 @@ services:
     ports:
       - "8888:8888"
     networks:
-      - mysql_default
+      - skinsight-net
     env_file:
       - .env
     environment:
@@ -14,5 +14,5 @@ services:
       - DB_PORT=${DB_PORT}
 
 networks:
-  mysql_default:
+  skinsight-net:
     external: true

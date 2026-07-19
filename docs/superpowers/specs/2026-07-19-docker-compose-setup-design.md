@@ -5,7 +5,7 @@ This document specifies the design for setting up Docker Compose to build and ru
 ## Context and Requirements
 
 - **Backend Service**: Formatted to build from local `dockerfile`. Exposes and listens on port `8888`.
-- **Database**: Already running in a container named `mysql_server` inside the `mysql_default` Docker network.
+- **Database**: Already running in a container named `mysql_server` inside the `skinsight-net` Docker network.
 - **Environment**: DB configuration (user, password, port, etc.) is stored in `.env`.
 - **Port Mapping**: The service must map port `8888:8888` on the host, and the database connection should retrieve settings from `.env`.
 
@@ -22,7 +22,7 @@ services:
     ports:
       - "8888:8888"
     networks:
-      - mysql_default
+      - skinsight-net
     env_file:
       - .env
     environment:
@@ -30,13 +30,13 @@ services:
       - DB_PORT=${DB_PORT}
 
 networks:
-  mysql_default:
+  skinsight-net:
     external: true
 ```
 
 ### Key Decisions
 
-1. **External Network Integration**: Instead of running a new database container, the compose file connects the web service directly to the existing external `mysql_default` network where `mysql_server` resides.
+1. **External Network Integration**: Instead of running a new database container, the compose file connects the web service directly to the existing external `skinsight-net` network where `mysql_server` resides.
 2. **Environment Variable Reading**:
    - `env_file: - .env` loads all environment configurations.
    - `environment: - DB_HOST=mysql_server` overrides the default `localhost` host from `.env` with the container name inside the Docker network.
