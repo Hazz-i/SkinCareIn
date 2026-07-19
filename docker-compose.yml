@@ -1,0 +1,18 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: dockerfile
+    ports:
+      - "8888:8888"
+    networks:
+      - mysql_default
+    env_file:
+      - .env
+    environment:
+      - DB_HOST=mysql_server
+      - DB_PORT=${DB_PORT}
+
+networks:
+  mysql_default:
+    external: true
