@@ -193,7 +193,6 @@ def get_educations_list(page_number=1, url="https://www.eduskincare.eu.org/", pr
                         'Date': formatted_date,
                         'Category': 'feature-posts'
                     }
-                    
                     all_posts_data.append(post_data)
                     
                 except Exception as e:
@@ -226,18 +225,19 @@ def get_educations_list(page_number=1, url="https://www.eduskincare.eu.org/", pr
                         img_src = img_element['src']
                 
                 descriptions = article.find('p', class_='item-snippet').text.strip() if article.find('p', class_='item-snippet') else ''
-                meta_data = [meta.text.strip() for meta in article.find_all('small') if meta.text.strip()]
+                # meta_data = [meta.text.strip() for meta in article.find_all('small') if meta.text.strip()]
+                # print(meta_data)
 
                 # Parse date from metadata
-                parsed_date = parse_date_from_metadata(meta_data)
-                formatted_date = parsed_date.strftime('%Y-%m-%d') if parsed_date else ''
+                # parsed_date = parse_date_from_metadata(meta_data)
+                # formatted_date = parsed_date.strftime('%Y-%m-%d') if parsed_date else ''
 
                 post_data = {
                     'Title': title,
                     'Link': link,
                     'Image': img_src,
                     'Snippet': descriptions,
-                    'Date': formatted_date,
+                    'Date': '',
                     'Category': 'article-items'
                 }
                 
