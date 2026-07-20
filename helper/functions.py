@@ -46,7 +46,7 @@ def extract_text_from_image(image_bytes: bytes, client) -> str:
     try:
         base64_image = convert_image_to_base64(image_bytes)
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.5-flash",
             contents=[
                 {
                     "inline_data": {
