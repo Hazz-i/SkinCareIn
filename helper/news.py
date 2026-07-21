@@ -1,6 +1,36 @@
 from helper import fetching_content
 from bs4 import BeautifulSoup
 import datetime
+import re
+
+def _parse_source_and_date(time_text: str):
+    """Parse source name and date from read__time element.
+    
+    Handles two Kompas.com formats:
+    - Old: "Kompas.com - 15 Juli 2026, 07:05 WIB"
+    - New: "Kompas.com, 15 Juli 2026, 07:05 WIB"
+    """
+    if ' - ' in time_text:
+        source = time_text.split(' - ')[0].strip()
+        date = time_text.split(' - ')[1].strip()
+        return source, date
+    
+    # New format: "Kompas.com, 15 Juli 2026, 07:05 WIB"
+    # Extract date like "15 Juli 2026" using regex
+    date_match = re.search(
+        r'(\d{1,2}\s+(?:Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s+\d{4})',
+        time_text,
+        re.IGNORECASE
+    )
+    if date_match:
+        date = date_match.group(1).strip()
+        # Source is everything before the first comma
+        source = time_text.split(',')[0].strip()
+        return source, date
+    
+    # Fallback: treat everything as source, date empty
+    return time_text.strip(), ''
+
 
 def parse_date_from_metadata(date):
     """Extract and parse date from metadata list"""
@@ -162,8 +192,7 @@ def get_news(url):
                 cover_image = img_element['src']
 
         time_elements = soup.find('div', class_='read__time').text.strip()
-        source = time_elements.split(' - ')[0].strip()
-        date = time_elements.split(' - ')[1].strip() if ' - ' in time_elements else ''
+        source, date = _parse_source_and_date(time_elements)
         
         author = soup.find('div', class_='credit-title-nameEditor').text.strip()
         
@@ -227,8 +256,7 @@ def get_news(url):
                 cover_image = img_element['src']
 
         time_elements = soup.find('div', class_='read__time').text.strip()
-        source = time_elements.split(' - ')[0].strip()
-        date = time_elements.split(' - ')[1].strip() if ' - ' in time_elements else ''
+        source, date = _parse_source_and_date(time_elements)
         
         author = soup.find('div', class_='credit-title-nameEditor').text.strip()
         
