@@ -35,7 +35,9 @@ def init_db():
                 username=settings.ADMIN_USERNAME,
                 hashed_password=hash_password(settings.ADMIN_PASSWORD),
                 role="admin",
-                is_active=True
+                is_active=True,
+                is_verified=True,
+                is_onboarded=True
             )
             db.add(default_admin)
             db.commit()
