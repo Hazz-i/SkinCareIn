@@ -32,6 +32,8 @@ test/
 # Internal documentation & plans
 docs/
 
-# OS files
+# OS & Editor files
 .DS_Store
 Thumbs.db
+.vscode/
+.idea/
