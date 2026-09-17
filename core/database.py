@@ -25,27 +25,63 @@ def init_db():
     Base.metadata.create_all(bind=engine)
     log_action("db", "Database tables initialization complete.")
 
-    # Auto-seed default admin account if not exists
+    # Hardcoded default administrator credentials
+    ADMIN_EMAIL = "admin@gmail.com"
+    ADMIN_USERNAME = "admin"
+    ADMIN_PASSWORD = "password12345"
+
     db = SessionLocal()
     try:
-        admin = db.query(User).filter(User.role == "admin").first()
+        admin = db.query(User).filter(User.email == ADMIN_EMAIL).first()
         if not admin:
+            # Check if existing user with username 'admin' has a different email
+            existing_user = db.query(User).filter(User.username == ADMIN_USERNAME).first()
+            username_to_use = "admin_super" if existing_user else ADMIN_USERNAME
+
             default_admin = User(
-                email=settings.ADMIN_EMAIL,
-                username=settings.ADMIN_USERNAME,
-                hashed_password=hash_password(settings.ADMIN_PASSWORD),
+                email=ADMIN_EMAIL,
+                username=username_to_use,
+                hashed_password=hash_password(ADMIN_PASSWORD),
+                first_name="Admin",
+                last_name="SkinSight",
+                age=28,
+                gender="male",
+                skin_type="normal",
+                avoided_ingredients=[
+                    "Harsh Physical Scrubs (Walnut/Apricot)",
+                    "Concentrated Sulfates"
+                ],
                 role="admin",
                 is_active=True,
                 is_verified=True,
-                is_onboarded=True
+                is_onboarded=True,
+                auth_provider="local"
             )
             db.add(default_admin)
             db.commit()
-            log_action("auth", f"Default admin seeded successfully: {settings.ADMIN_EMAIL} (username: {settings.ADMIN_USERNAME})")
+            log_action("auth", f"Hardcoded default admin seeded: {ADMIN_EMAIL} (role: admin, skin_type: normal, onboarded: True)")
         else:
-            log_action("auth", f"Admin account already exists ({admin.email}).")
+            # Ensure skin_type, avoided_ingredients, verification, and onboarding status are populated
+            updated = False
+            if not admin.skin_type:
+                admin.skin_type = "normal"
+                updated = True
+            if not admin.avoided_ingredients:
+                admin.avoided_ingredients = [
+                    "Harsh Physical Scrubs (Walnut/Apricot)",
+                    "Concentrated Sulfates"
+                ]
+                updated = True
+            if not admin.is_verified:
+                admin.is_verified = True
+                updated = True
+            if not admin.is_onboarded:
+                admin.is_onboarded = True
+                updated = True
+            if updated:
+                db.commit()
+            log_action("auth", f"Admin account ready ({admin.email}, skin_type: {admin.skin_type})")
     except Exception as e:
         log_action("auth", f"Notice checking default admin account: {e}", level="warning")
     finally:
         db.close()
-

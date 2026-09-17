@@ -17,10 +17,10 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440 # 24 hours
     
-    # Default Admin Seed
-    ADMIN_EMAIL: str = "admin@skinsight.com"
+    # Default Admin Seed (Fallback defaults; seeder is hardcoded in core.database)
+    ADMIN_EMAIL: str = "admin@gmail.com"
     ADMIN_USERNAME: str = "admin"
-    ADMIN_PASSWORD: str = "Admin123!"
+    ADMIN_PASSWORD: str = "password12345"
 
     # CORS
     CORS_ORIGIN: str = "http://localhost:3000,http://localhost:8888"
