@@ -77,12 +77,12 @@ class EducationService:
 
         if not scraped:
             log_action("scrap", f"Education detail not found on source: {article_link}", level="error")
-            raise HTTPException(status_code=404, detail="Detail artikel edukasi tidak ditemukan.")
+            raise HTTPException(status_code=404, detail="Education article detail not found.")
 
         new_detail = EducationArticleDetail(
             article_link=article_link,
             title=scraped.get("Title", ""),
-            author=scraped.get("Author", "EduSkincare Team"),
+            author=scraped.get("Author", "Dr Michelle Wong (Lab Muffin)"),
             date=str(scraped.get("Date", "")),
             cover_image=scraped.get("Cover_Image", ""),
             content_markdown=scraped.get("Content", "")

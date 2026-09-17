@@ -1,309 +1,287 @@
-from helper import fetching_content
-from bs4 import BeautifulSoup
-import datetime
+# helper/news.py
+"""
+BeautyJournal (https://www.beautyjournal.id/beauty-az) Skincare News & Beauty A-Z Scraper
+Powered by Scrapling (https://github.com/d4vinci/Scrapling)
+Supports infinite scroll pagination (skip/limit) and full article/glossary detail scraping.
+"""
+import urllib.request
+import urllib.parse
+import json
 import re
+from typing import List, Dict, Any, Optional
+from scrapling import Selector, Fetcher
+from core.logger import log_action
 
-def _parse_source_and_date(time_text: str):
-    """Parse source name and date from read__time element.
-    
-    Handles two Kompas.com formats:
-    - Old: "Kompas.com - 15 Juli 2026, 07:05 WIB"
-    - New: "Kompas.com, 15 Juli 2026, 07:05 WIB"
-    """
-    if ' - ' in time_text:
-        source = time_text.split(' - ')[0].strip()
-        date = time_text.split(' - ')[1].strip()
-        return source, date
-    
-    # New format: "Kompas.com, 15 Juli 2026, 07:05 WIB"
-    # Extract date like "15 Juli 2026" using regex
-    date_match = re.search(
-        r'(\d{1,2}\s+(?:Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)\s+\d{4})',
-        time_text,
-        re.IGNORECASE
-    )
-    if date_match:
-        date = date_match.group(1).strip()
-        # Source is everything before the first comma
-        source = time_text.split(',')[0].strip()
-        return source, date
-    
-    # Fallback: treat everything as source, date empty
-    return time_text.strip(), ''
+BASE_URL = "https://www.beautyjournal.id/beauty-az"
+API_BASE = "https://bj-public-api.beautyjournal.id"
+DEFAULT_COVER = "https://images.soco.id/beautyjournal/default-az.jpg"
 
+COMMON_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Origin": "https://www.beautyjournal.id",
+    "Referer": "https://www.beautyjournal.id/beauty-az",
+    "Accept": "application/json, text/html, */*"
+}
 
-def parse_date_from_metadata(date):
-    """Extract and parse date from metadata list"""
-    if not date:
-        return date
+def _fetch_api_json(url: str, timeout: int = 15) -> Optional[Dict[str, Any]]:
+    """Fetch JSON from BeautyJournal public API using Scrapling Fetcher with urllib fallback."""
+    try:
+        response = Fetcher.get(url, headers=COMMON_HEADERS, timeout=timeout)
+        if response.status == 200:
+            if hasattr(response, "json"):
+                try:
+                    return response.json()
+                except Exception:
+                    pass
+            if hasattr(response, "body") and response.body:
+                return json.loads(response.body.decode("utf-8", errors="ignore"))
+    except Exception as e:
+        log_action("scrap", f"Scrapling Fetcher JSON fallback for {url}: {e}", level="warning")
+
+    try:
+        req = urllib.request.Request(url, headers=COMMON_HEADERS)
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read().decode("utf-8", errors="ignore"))
+    except Exception as e:
+        log_action("scrap", f"Failed to fetch JSON from {url}: {e}", level="error")
+        return None
+
+def _fetch_html_with_scrapling(url: str, timeout: int = 15) -> str:
+    """Fetch HTML using Scrapling Fetcher with urllib fallback."""
+    try:
+        response = Fetcher.get(url, headers=COMMON_HEADERS, timeout=timeout)
+        if response.status == 200:
+            if hasattr(response, "text") and response.text:
+                return response.text
+            if hasattr(response, "body") and response.body:
+                return response.body.decode("utf-8", errors="ignore")
+    except Exception as e:
+        log_action("scrap", f"Scrapling Fetcher HTML fallback for {url}: {e}", level="warning")
+
+    req = urllib.request.Request(url, headers=COMMON_HEADERS)
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        return resp.read().decode("utf-8", errors="ignore")
+
+def _html_to_markdown(html_content: str) -> str:
+    """Parse HTML blocks into clean Markdown using Scrapling Selector."""
+    if not html_content:
+        return ""
     
-    # Mapping bulan Indonesia ke English
-    month_mapping = {
-        'januari': 'January', 'februari': 'February', 'maret': 'March',
-        'april': 'April', 'mei': 'May', 'juni': 'June',
-        'juli': 'July', 'agustus': 'August', 'september': 'September',
-        'oktober': 'October', 'november': 'November', 'desember': 'December',
-        'jan': 'Jan', 'feb': 'Feb', 'mar': 'Mar', 'apr': 'Apr',
-        'jun': 'Jun', 'jul': 'Jul', 'agu': 'Aug', 'sep': 'Sep',
-        'okt': 'Oct', 'nov': 'Nov', 'des': 'Dec'
-    }
-    
-    # Handle format like "27/06/2021, 12:05 WIB" - extract only date part
-    if ',' in date and 'WIB' in date:
-        date = date.split(',')[0].strip()  # Get "27/06/2021"
-    
-    # Convert Indonesian month names to English
-    date_english = date.lower()
-    for indo_month, eng_month in month_mapping.items():
-        date_english = date_english.replace(indo_month, eng_month)
-    
-    # Capitalize first letter of each word
-    date_english = ' '.join(word.capitalize() for word in date_english.split())
-    
-    # Daftar format tanggal yang mungkin
-    date_formats = [
-        '%d/%m/%Y',     # 27/06/2021
-        '%d %B %Y',     # 27 July 2025
-        '%d %b %Y',     # 27 Jul 2025
-        '%d %B, %Y',    # 27 July, 2025
-        '%d %b, %Y',    # 27 Jul, 2025
-        '%B %d, %Y',    # July 27, 2025
-        '%b %d, %Y',    # Jul 27, 2025
-        '%Y-%m-%d',     # 2025-07-27
-        '%m/%d/%Y',     # 06/27/2021
-        '%d-%m-%Y',     # 27-06-2021
-        '%Y/%m/%d',     # 2021/06/27
-    ]
-    
-    for date_format in date_formats:
-        try:
-            date_obj = datetime.datetime.strptime(date_english, date_format)
-            # Return in YYYY-MM-DD format
-            return date_obj.strftime('%Y-%m-%d')
-        except ValueError:
+    doc = Selector(html_content)
+    elements = doc.css("p, h1, h2, h3, h4, h5, h6, blockquote, ul, ol, div.paragraph")
+    content_blocks = []
+
+    for el in elements:
+        tag = el.tag
+        text = "".join(el.css("::text").getall()).strip()
+        if not text:
             continue
-    
-    # Jika semua format gagal, return original date
-    print(f"Could not parse date: {date}")
-    return date
 
-def get_news_list(page=1):
-    """Mengambil daftar berita dari URL yang diberikan."""
+        low_text = text.lower()
+        if "baca juga" in low_text or "cookie" in low_text or "subscribe" in low_text:
+            continue
 
-    BASE_URL = f'https://www.kompas.com/tag/skincare?type=artikel&page={page}'
+        if tag == "h1":
+            content_blocks.append(f"# {text}")
+        elif tag == "h2":
+            content_blocks.append(f"## {text}")
+        elif tag == "h3":
+            content_blocks.append(f"### {text}")
+        elif tag == "h4":
+            content_blocks.append(f"#### {text}")
+        elif tag in ("h5", "h6"):
+            content_blocks.append(f"##### {text}")
+        elif tag == "blockquote":
+            content_blocks.append(f"> {text}")
+        elif tag in ("ul", "ol"):
+            list_items = el.css("li")
+            for li in list_items:
+                li_text = "".join(li.css("::text").getall()).strip()
+                if li_text:
+                    content_blocks.append(f"- {li_text}")
+        else:
+            content_blocks.append(text)
 
-    content = fetching_content(BASE_URL)
-    if not content:
-        print("Failed to fetch content. Stopping.")
+    markdown_text = "\n\n".join(content_blocks)
+    if not markdown_text:
+        all_text = [t.strip() for t in doc.css("::text").getall() if len(t.strip()) > 10]
+        markdown_text = "\n\n".join(all_text)
 
-    soup = BeautifulSoup(content, "html.parser")
-    article_elements = soup.find_all('div', class_='articleItem')
+    return markdown_text
 
-    # Mencari semua elemen dengan atribut data-ci-pagination-page
-    page_elements = soup.find_all(attrs={'data-ci-pagination-page': True})
-    page_number_list = []
+def get_news_list(page: int = 1, page_size: int = 15) -> Dict[str, Any]:
+    """
+    Retrieve BeautyJournal skincare news & beauty A-Z items.
+    Handles the infinite scroll mechanism using skip & limit query parameters.
+    """
+    skip = (page - 1) * page_size
+    api_url = f"{API_BASE}/glossary?limit={page_size}&skip={skip}"
+    log_action("scrap", f"Fetching BeautyJournal infinite scroll feed (page={page}, skip={skip}, limit={page_size}) via Scrapling...")
 
-    for pages in page_elements:
-        page_attr = pages.get('data-ci-pagination-page')
-        if page_attr and page_attr.isdigit():
-            page_number_list.append(page_attr)
+    data = _fetch_api_json(api_url)
+    article_list = []
 
-    # Mengurutkan dan mengonversi ke integer lalu kembali ke string untuk konsistensi
-    page_number_list = sorted(set(page_number_list), key=int)
+    if data and data.get("success"):
+        groups = data.get("data", {})
+        # Data is returned as dictionary of alphabetical groups e.g. {"#": [...], "A": [...]}
+        for _, items in groups.items():
+            for item in items:
+                title = item.get("title", "").strip()
+                slug = item.get("slug", "").strip()
+                if not title or not slug:
+                    continue
+
+                link = f"https://www.beautyjournal.id/beauty-az/{slug}"
+                
+                # Extract image
+                images = item.get("images") or []
+                img_url = DEFAULT_COVER
+                for img_obj in images:
+                    if isinstance(img_obj, dict) and img_obj.get("url"):
+                        img_url = img_obj.get("url")
+                        if img_obj.get("is_cover"):
+                            break
+
+                # Extract date
+                raw_date = str(item.get("published_at") or item.get("created_at") or "")
+                date_str = raw_date[:10] if raw_date else ""
+
+                # Extract category / tag
+                tags = item.get("tags") or []
+                category = tags[0].get("name") if (tags and isinstance(tags[0], dict)) else "Beauty A-Z"
+
+                summary = item.get("summary") or ""
+                if not summary and item.get("content"):
+                    summary = _html_to_markdown(item.get("content"))[:200]
+
+                article_list.append({
+                    "Title": title,
+                    "Link": link,
+                    "Image": img_url,
+                    "Date": date_str,
+                    "Category": category,
+                    "Snippet": summary.strip()
+                })
+
+    log_action("scrap", f"BeautyJournal extracted {len(article_list)} items for page {page}")
 
     paginations = {
-        'Current_Page': str(page),
-        'First_Page': str(page_number_list[0]) if page > 1 else None,
-        'Prev_Page': str(page - 1) if page > 1 else None,
-        'Next_Page': str(page + 1) if page < 70 else None,
-        'Last_Page': str(page_number_list[-1]) if page < 70 else None
+        "Current_Page": str(page),
+        "Prev_Page": str(page - 1) if page > 1 else None,
+        "Next_Page": str(page + 1) if len(article_list) >= page_size else None,
+        "Limit": page_size,
+        "Skip": skip
     }
 
-    print(f"Jumlah artikel yang ditemukan: {len(article_elements)}")
-
-    article_list = []
-    for article in article_elements:
-        title = article.find('h2', class_='articleTitle').text.strip()
-        link = article.find('a')['href']
-        img = article.find('img')['src'] if article.find('img') else ''
-        
-        # Extract date from articlePost-date
-        post_elements = article.find('div', class_='articlePost')
-        date = ''
-        category = ''
-        
-        if post_elements:
-            # Extract date
-            date_element = post_elements.find('div', class_='articlePost-date')
-            if date_element:
-                date = date_element.text.strip()
-            
-            # Extract category from articlePost-subtitle
-            category_element = post_elements.find('div', class_='articlePost-subtitle')
-            if category_element:
-                category = category_element.text.strip()
-        
-        article_list.append({
-            'Title': title,
-            'Link': link,
-            'Image': img,
-            'Date': parse_date_from_metadata(date) if date else date,
-            'Category': category
-        })
-        
-    
-    data = {
-        'Article_List': article_list,
-        'Pagination': paginations
+    return {
+        "Article_List": article_list,
+        "Pagination": paginations
     }
-        
-    return data
 
-def get_news(url):
-    """Mengambil detail berita dari URL yang diberikan."""
-    
-    content = fetching_content(url)
-    if not content:
-        print("Failed to fetch content. Stopping.")
-        return
-    
-    soup = BeautifulSoup(content, "html.parser")
-    pagination = soup.find('div', class_='read__paging clearfix')
-    
-    news_data = []
+def get_news(url: str) -> List[Dict[str, Any]]:
+    """
+    Retrieve full article or glossary detail from BeautyJournal or external URL.
+    Returns a list with a single dictionary for compatibility with NewsService.
+    """
+    log_action("scrap", f"Fetching article detail for {url} via Scrapling...")
+    slug = url.rstrip("/").split("/")[-1].split("?")[0]
 
-    if pagination:
-        print("Pagination found.")
-        print('-' *20)
-        url = url + '?page=all'
-        
-        content = fetching_content(url)
-        if not content:
-            print("Failed to fetch content. Stopping.")
-            return
-        
-        title = soup.find('h1', class_='read__title').text.strip()
-        
-        photo_wrap = soup.find('div', class_='photo__wrap')
-        cover_image = ''
-        if photo_wrap:
-            img_element = photo_wrap.find('img')
-            if img_element and img_element.get('src'):
-                cover_image = img_element['src']
+    # 1. Try BeautyJournal Glossary API by slug filter
+    glossary_filter = urllib.parse.quote(json.dumps({"slug": slug}))
+    glossary_api = f"{API_BASE}/glossary?filter={glossary_filter}&limit=1"
+    glossary_data = _fetch_api_json(glossary_api)
 
-        time_elements = soup.find('div', class_='read__time').text.strip()
-        source, date = _parse_source_and_date(time_elements)
-        
-        author = soup.find('div', class_='credit-title-nameEditor').text.strip()
-        
-        content_elements = soup.find('div', class_='read__content')
-        content_elements_list = content_elements.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']) 
-        if not content_elements_list:
-            print("No content elements found.")
+    if glossary_data and glossary_data.get("success"):
+        data_dict = glossary_data.get("data", {})
+        for _, items in data_dict.items():
+            if items and len(items) > 0:
+                item = items[0]
+                title = item.get("title", "")
+                
+                # Image
+                images = item.get("images") or []
+                cover_image = DEFAULT_COVER
+                for img_obj in images:
+                    if isinstance(img_obj, dict) and img_obj.get("url"):
+                        cover_image = img_obj.get("url")
+                        if img_obj.get("is_cover"):
+                            break
 
-        # Extract text from all paragraph and heading elements and format as Markdown
-        content_text = []
-        for element in content_elements_list:
-            # Remove any img tags from the element
-            for img in element.find_all('img'):
-                img.decompose()
-            
-            # Get text content and strip whitespace
-            text = element.get_text(strip=True)
-            if text and 'baca juga' not in text.lower():  # Only add non-empty text and skip "baca juga"
-                # Format as Markdown based on tag type
-                if element.name == 'h1':
-                    content_text.append(f"# {text}")
-                elif element.name == 'h2':
-                    content_text.append(f"## {text}")
-                elif element.name == 'h3':
-                    content_text.append(f"### {text}")
-                elif element.name == 'h4':
-                    content_text.append(f"#### {text}")
-                elif element.name == 'h5':
-                    content_text.append(f"##### {text}")
-                elif element.name == 'h6':
-                    content_text.append(f"###### {text}")
-                else:  # p tag
-                    content_text.append(text)
-        
-        # Join all paragraphs with double line breaks for Markdown formatting
-        full_content = '\n\n'.join(content_text)
-        
-        # Content in Markdown format (only the content, not metadata)
-        print(f"Number of content elements found: {len(content_text)}")
-        
-        news_data.append({
-            'Title': title,
-            'ImageUrl': cover_image,
-            'Date': parse_date_from_metadata(date),
-            'Source': source,
-            'Author': author,
-            'Content': full_content,
-        })
-        
-    else:
-        print("No pagination found.")
-        print("-" * 20)
-        
-        title = soup.find('h1', class_='read__title').text.strip()
-        
-        photo_wrap = soup.find('div', class_='photo__wrap')
-        cover_image = ''
-        if photo_wrap:
-            img_element = photo_wrap.find('img')
-            if img_element and img_element.get('src'):
-                cover_image = img_element['src']
+                raw_date = str(item.get("published_at") or item.get("created_at") or "")
+                date_str = raw_date[:10] if raw_date else ""
+                author = item.get("owner", {}).get("name") if isinstance(item.get("owner"), dict) else "Beauty Journal Editorial"
+                
+                raw_html = item.get("content") or item.get("summary") or ""
+                markdown_content = _html_to_markdown(raw_html)
 
-        time_elements = soup.find('div', class_='read__time').text.strip()
-        source, date = _parse_source_and_date(time_elements)
-        
-        author = soup.find('div', class_='credit-title-nameEditor').text.strip()
-        
-        content_elements = soup.find('div', class_='read__content')
-        content_elements_list = content_elements.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']) 
-        if not content_elements_list:
-            print("No content elements found.")
+                return [{
+                    "Title": title,
+                    "Cover_Image": cover_image,
+                    "ImageUrl": cover_image,
+                    "Date": date_str,
+                    "Source": "BeautyJournal",
+                    "Author": author,
+                    "Content": markdown_content
+                }]
 
-        # Extract text from all paragraph and heading elements and format as Markdown
-        content_text = []
-        for element in content_elements_list:
-            # Remove any img tags from the element
-            for img in element.find_all('img'):
-                img.decompose()
-            
-            # Get text content and strip whitespace
-            text = element.get_text(strip=True)
-            if text and 'baca juga' not in text.lower():  # Only add non-empty text and skip "baca juga"
-                # Format as Markdown based on tag type
-                if element.name == 'h1':
-                    content_text.append(f"# {text}")
-                elif element.name == 'h2':
-                    content_text.append(f"## {text}")
-                elif element.name == 'h3':
-                    content_text.append(f"### {text}")
-                elif element.name == 'h4':
-                    content_text.append(f"#### {text}")
-                elif element.name == 'h5':
-                    content_text.append(f"##### {text}")
-                elif element.name == 'h6':
-                    content_text.append(f"###### {text}")
-                else:  # p tag
-                    content_text.append(text)
-        
-        # Join all paragraphs with double line breaks for Markdown formatting
-        full_content = '\n\n'.join(content_text)
-        
-        # Content in Markdown format (only the content, not metadata)
-        print(f"Number of content elements found: {len(content_text)}")
-        
-        news_data.append({
-            'Title': title,
-            'Cover_Image': cover_image,
-            'Date': parse_date_from_metadata(date),
-            'Source': source,
-            'Author': author,
-            'Content': full_content,
-        })
-    
-    return news_data
+    # 2. Try BeautyJournal Posts API (editorial articles)
+    post_filter = urllib.parse.quote(json.dumps({"slug": slug}))
+    posts_api = f"{API_BASE}/posts?filter={post_filter}&limit=1"
+    posts_data = _fetch_api_json(posts_api)
+
+    if posts_data and posts_data.get("success") and posts_data.get("data"):
+        p = posts_data["data"][0]
+        title = p.get("title", "")
+        author = p.get("owner", {}).get("name", "Beauty Journal Editorial") if isinstance(p.get("owner"), dict) else "Beauty Journal Editorial"
+        date_str = str(p.get("published_at", ""))[:10]
+        cover_image = p.get("attachments", {}).get("featured_image", DEFAULT_COVER) if isinstance(p.get("attachments"), dict) else DEFAULT_COVER
+        raw_html = p.get("content", "")
+        markdown_content = _html_to_markdown(raw_html)
+
+        return [{
+            "Title": title,
+            "Cover_Image": cover_image,
+            "ImageUrl": cover_image,
+            "Date": date_str,
+            "Source": "BeautyJournal",
+            "Author": author,
+            "Content": markdown_content
+        }]
+
+    # 3. Fallback: Direct HTML scraping via Scrapling Selector
+    try:
+        html = _fetch_html_with_scrapling(url)
+        doc = Selector(html)
+        title = (
+            doc.css("h1.read__title::text, h1.entry-title::text, h1::text").get()
+            or doc.css("meta[property='og:title']::attr(content)").get()
+            or "Skincare Article"
+        )
+        cover_image = (
+            doc.css("meta[property='og:image']::attr(content)").get()
+            or doc.css("div.photo__wrap img::attr(src), img.wp-post-image::attr(src)").get()
+            or DEFAULT_COVER
+        )
+        date_str = (
+            doc.css("meta[property='article:published_time']::attr(content)").get()
+            or doc.css("time::text").get()
+            or ""
+        )
+        author = (
+            doc.css("div.credit-title-nameEditor::text, span.author::text, meta[name='author']::attr(content)").get()
+            or "Beauty Journal Editorial"
+        )
+        markdown_content = _html_to_markdown(html)
+
+        return [{
+            "Title": title.strip(),
+            "Cover_Image": cover_image.strip(),
+            "ImageUrl": cover_image.strip(),
+            "Date": date_str[:10] if date_str else "",
+            "Source": "BeautyJournal",
+            "Author": author.strip(),
+            "Content": markdown_content
+        }]
+    except Exception as e:
+        log_action("scrap", f"Direct HTML scraping failed for {url}: {e}", level="error")
+        return []

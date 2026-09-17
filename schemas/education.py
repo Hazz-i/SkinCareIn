@@ -20,7 +20,7 @@ class EducationListResponse(BaseModel):
     page: int
 
 class EducationDetailRequest(BaseModel):
-    article_link: str = Field(..., description="URL artikel edukasi yang ingin dibuka")
+    article_link: str = Field(..., description="URL of the educational article to retrieve")
 
 class EducationDetailResponse(BaseModel):
     title: str

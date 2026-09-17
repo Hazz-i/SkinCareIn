@@ -20,7 +20,7 @@ class NewsListResponse(BaseModel):
     page: int
 
 class NewsDetailRequest(BaseModel):
-    article_link: str = Field(..., description="URL berita kompas yang ingin dibuka")
+    article_link: str = Field(..., description="URL of the news article to retrieve")
 
 class NewsDetailResponse(BaseModel):
     title: str

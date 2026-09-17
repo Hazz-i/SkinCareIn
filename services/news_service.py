@@ -76,7 +76,7 @@ class NewsService:
 
         if not scraped:
             log_action("scrap", f"Article detail not found on source: {article_link}", level="error")
-            raise HTTPException(status_code=404, detail="Detail berita tidak ditemukan.")
+            raise HTTPException(status_code=404, detail="News article detail not found.")
 
         item = scraped[0]
         new_detail = NewsArticleDetail(
@@ -84,7 +84,7 @@ class NewsService:
             title=item.get("Title", ""),
             cover_image=item.get("Cover_Image") or item.get("ImageUrl") or "",
             date=item.get("Date", ""),
-            source=item.get("Source", "Kompas.com"),
+            source=item.get("Source", "BeautyJournal"),
             author=item.get("Author", ""),
             content_markdown=item.get("Content", "")
         )

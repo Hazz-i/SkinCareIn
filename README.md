@@ -25,9 +25,12 @@
 - **ResNet-50 Architecture:** Classifies facial photograph inputs into dermatological skin categories (`dry`, `normal`, `oily`).
 - **Personalized Catalog Recommendations:** Recommends curated skincare products matching the detected skin profile.
 
-### 4. ⚡ Two-Tier Database Caching Architecture
-- **24-Hour Periodic Sync:** News and educational topic feeds are stored in PostgreSQL and refreshed daily in the background via **APScheduler**.
-- **1-Time Lazy Detail Caching:** Full article content is scraped once on initial user request, permanently stored in PostgreSQL, and served instantaneously on subsequent reads without redundant network calls.
+### 4. ⚡ Two-Tier Database Caching & Scrapling Integration
+- **Powered by Scrapling:** Fast, resilient web scraping engine with adaptive selectors and automatic HTML-to-Markdown conversion.
+- **Education Provider (Lab Muffin Beauty Science):** Scrapes educational articles from `https://labmuffin.com/` with multi-page pagination support (`/page/{n}/`).
+- **News Provider (BeautyJournal Beauty A-Z):** Ingests skincare news & ingredient encyclopedia items from `https://www.beautyjournal.id/beauty-az` supporting its infinite scroll mechanism via `skip` & `limit` query parameters.
+- **24-Hour Periodic Sync:** Topic feeds are cached in PostgreSQL and refreshed daily via **APScheduler**.
+- **1-Time Lazy Detail Caching:** Full article content is scraped once upon initial request, permanently cached in PostgreSQL, and served instantaneously on subsequent reads.
 
 ### 5. 🛡️ High Availability, Rate Limiting & Tagged Logging
 - **Nginx Reverse Proxy & Load Balancer:** Distributes traffic across containerized API worker nodes (`api1`, `api2`) on port `8888`.
@@ -43,6 +46,7 @@
 | **Framework** | [FastAPI](https://fastapi.tiangolo.com/) | High-performance async Python web framework |
 | **Language** | [Python 3.11+](https://www.python.org/) | Modern typing, PEP 621 packaging |
 | **Database** | [PostgreSQL 16](https://www.postgresql.org/) & [SQLAlchemy 2.0](https://www.sqlalchemy.org/) | Relational storage and ORM |
+| **Scraping Engine** | [Scrapling](https://github.com/d4vinci/Scrapling) | High-performance scraper with anti-bot bypass & adaptive selectors |
 | **LLM Gateway** | [LiteLLM](https://github.com/BerriAI/litellm) | Multi-provider unified LLM proxy with fallback support |
 | **Computer Vision** | [PyTorch](https://pytorch.org/), [Torchvision](https://pytorch.org/vision/), [OpenCV](https://opencv.org/) | ResNet-50 deep learning model and image preprocessing |
 | **Scheduler** | [APScheduler](https://apscheduler.readthedocs.io/) | Background cron jobs for periodic cache synchronization |
@@ -196,10 +200,10 @@ All operational endpoints are versioned with the `/api/v1/` prefix:
 - `POST /api/v1/skincare/recommendations` — Fetch product recommendations tailored to a specific skin type.
 
 ### 3. News & Education Caching (`/api/v1/news`, `/api/v1/educations`)
-- `GET /api/v1/news` — Retrieve cached skincare news list (paginated, 24h background sync).
-- `POST /api/v1/news/detail` — Retrieve full news article (1-time lazy cache into database).
-- `GET /api/v1/educations` — Retrieve cached education topics (paginated, 24h background sync).
-- `POST /api/v1/educations/detail` — Retrieve full educational guide (1-time lazy cache into database).
+- `GET /api/v1/news` — Retrieve cached BeautyJournal news & beauty encyclopedia list (supports infinite scroll pagination via `page`, 24h background sync).
+- `POST /api/v1/news/detail` — Retrieve full BeautyJournal article detail (1-time lazy cache into database).
+- `GET /api/v1/educations` — Retrieve cached Lab Muffin science education list (supports multi-page pagination via `page`, 24h background sync).
+- `POST /api/v1/educations/detail` — Retrieve full Lab Muffin educational guide formatted in Markdown (1-time lazy cache into database).
 
 ### 4. Administrator Operations (`/api/v1/admin`)
 - `POST /api/v1/admin/sync/news` — Manually trigger news scraping & sync *(Requires 'admin' role)*.
