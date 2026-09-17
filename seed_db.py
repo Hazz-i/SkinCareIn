@@ -1,8 +1,15 @@
 import os
 import re
 import glob
+import sys
 import pandas as pd
 from utils.database import engine, connect_to_db
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 def clean_extracted_text(raw_text) -> str:
     """Clean markdown, extra spaces, and newlines from description"""
