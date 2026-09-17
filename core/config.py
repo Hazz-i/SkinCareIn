@@ -22,7 +22,6 @@ class Settings(BaseSettings):
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "Admin123!"
 
-    
     # CORS
     CORS_ORIGIN: str = "http://localhost:3000,http://localhost:8888"
 
@@ -38,5 +37,13 @@ class Settings(BaseSettings):
     # Rate Limiting
     RATE_LIMIT_DEFAULT: str = "60/minute"
     RATE_LIMIT_HEAVY: str = "10/minute"
+
+    # SMTP Email Configuration
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASS: str = ""
+    SMTP_FROM: str = "no-reply@skinsight.com"
+    APP_BASE_URL: str = "http://localhost:8888"
 
 settings = Settings()
