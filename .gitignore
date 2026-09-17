@@ -7,3 +7,9 @@ test/
 *.ipynb
 
 *.csv
+.commandcode
+.codegraph
+.agents
+*.egg-info/
+.superpowers/
+pytest.ini
