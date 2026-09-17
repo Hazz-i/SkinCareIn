@@ -1,15 +1,37 @@
+# Environments & local configuration
 .venv/
 venv/
+ENV/
+env/
 .env
-__pycache__/
 
+# Python caches & bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+pytest.ini
+
+# Packaging & build artifacts
+*.egg-info/
+*.egg
+build/
+dist/
+
+# Data & Jupyter Notebooks
 test/
 *.ipynb
-
 *.csv
-.commandcode
-.codegraph
-.agents
-*.egg-info/
+
+# AI Assistant & IDE metadata folders
+.agents/
+.codegraph/
+.commandcode/
 .superpowers/
-pytest.ini
+
+# Internal documentation & plans
+docs/
+
+# OS files
+.DS_Store
+Thumbs.db

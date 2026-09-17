@@ -16,3 +16,4 @@ def get_educations(page: int = Query(1, ge=1), db: Session = Depends(get_db)):
 def get_education_detail(request: EducationDetailRequest, db: Session = Depends(get_db)):
     """Mengambil detail artikel edukasi (Lazy Cache: scraping 1x saat pertama kali diakses, kunjungan berikutnya disajikan dari database)."""
     return EducationService.get_or_scrape_education_detail(db, request.article_link)
+    
