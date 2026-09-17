@@ -9,8 +9,9 @@ from core.config import settings
 
 api_router = APIRouter()
 
-@api_router.get("/health", tags=["Health"])
+@api_router.get("/health", tags=["Health"], summary="Health Check Service")
 def health_check():
+    """Memeriksa status operasional service backend dan versi rilis."""
     return {
         "status": "ok",
         "service": settings.PROJECT_NAME,

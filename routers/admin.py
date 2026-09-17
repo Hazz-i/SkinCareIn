@@ -9,22 +9,22 @@ from core.logger import log_action
 
 router = APIRouter(tags=["Admin Operations"])
 
-@router.post("/sync/news")
+@router.post("/sync/news", summary="Manual Sync Berita Skincare (Khusus Admin)")
 def sync_news_manual(
     db: Session = Depends(get_db),
     admin_user=Depends(require_role(["admin"]))
 ):
-    """Trigger manual re-sync of news articles from source (Khusus Admin)"""
+    """Memicu proses scraping dan sinkronisasi artikel berita terbaru ke database PostgreSQL secara manual (Memerlukan autentikasi role `admin`)."""
     log_action("admin", f"Manual news sync triggered by admin: {admin_user.email}")
     count = NewsService.sync_news_from_source(db, max_pages=3)
     return {"status": "success", "message": f"Berhasil sinkronisasi {count} berita terbaru.", "synced_count": count}
 
-@router.post("/sync/educations")
+@router.post("/sync/educations", summary="Manual Sync Edukasi Skincare (Khusus Admin)")
 def sync_educations_manual(
     db: Session = Depends(get_db),
     admin_user=Depends(require_role(["admin"]))
 ):
-    """Trigger manual re-sync of education topics from source (Khusus Admin)"""
+    """Memicu proses scraping dan sinkronisasi artikel edukasi terbaru ke database PostgreSQL secara manual (Memerlukan autentikasi role `admin`)."""
     log_action("admin", f"Manual educations sync triggered by admin: {admin_user.email}")
     count = EducationService.sync_educations_from_source(db, max_pages=2)
     return {"status": "success", "message": f"Berhasil sinkronisasi {count} topik edukasi terbaru.", "synced_count": count}

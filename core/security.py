@@ -7,7 +7,11 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from core.config import settings
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-security_bearer = HTTPBearer(auto_error=False)
+security_bearer = HTTPBearer(
+    auto_error=False,
+    scheme_name="BearerAuth",
+    description="Masukkan JWT access token (format: Bearer <token>)"
+)
 
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)

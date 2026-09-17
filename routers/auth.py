@@ -39,14 +39,17 @@ def require_role(allowed_roles: list):
         return user
     return role_checker
 
-@router.post("/register", response_model=UserProfileResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=UserProfileResponse, status_code=status.HTTP_201_CREATED, summary="Registrasi Pengguna Baru")
 def register(request: UserRegisterRequest, db: Session = Depends(get_db)):
+    """Mendaftarkan akun pengguna baru dengan role default `user`."""
     return AuthService.register_user(db, request)
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse, summary="Login Pengguna & Dapatkan JWT Access Token")
 def login(request: UserLoginRequest, db: Session = Depends(get_db)):
+    """Autentikasi akun pengguna/admin menggunakan username/email dan password. Mengembalikan Bearer JWT access token."""
     return AuthService.authenticate_user(db, request)
 
-@router.get("/me", response_model=UserProfileResponse)
+@router.get("/me", response_model=UserProfileResponse, summary="Ambil Profil Pengguna Saat Ini")
 def get_me(user: User = Depends(get_current_user)):
+    """Mengambil data profil akun pengguna yang sedang login berdasarkan Bearer token pada header Authorization."""
     return user

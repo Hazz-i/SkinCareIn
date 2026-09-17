@@ -7,12 +7,12 @@ from services.news_service import NewsService
 
 router = APIRouter(tags=["Skincare News"])
 
-@router.get("", response_model=NewsListResponse)
+@router.get("", response_model=NewsListResponse, summary="Ambil Daftar Berita Skincare (Cached)")
 def get_news(page: int = Query(1, ge=1), db: Session = Depends(get_db)):
-    """Mengambil daftar berita skincare (disajikan cepat dari cache PostgreSQL)"""
+    """Mengambil daftar berita skincare (disajikan cepat dari cache PostgreSQL yang diperbarui harian)."""
     return NewsService.get_cached_news_list(db, page=page)
 
-@router.post("/detail", response_model=NewsDetailResponse)
+@router.post("/detail", response_model=NewsDetailResponse, summary="Ambil Detail Artikel Berita (Lazy Cached)")
 def get_news_detail(request: NewsDetailRequest, db: Session = Depends(get_db)):
-    """Mengambil detail berita (Lazy Cache: scrape 1x saat pertama kali diakses, seterusnya dari DB)"""
+    """Mengambil detail berita (Lazy Cache: scraping 1x saat pertama kali diakses, kunjungan berikutnya disajikan dari database)."""
     return NewsService.get_or_scrape_news_detail(db, request.article_link)
