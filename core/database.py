@@ -18,6 +18,32 @@ def get_db():
         db.close()
 
 def init_db():
+    from models.user import User
+    from core.security import hash_password
+
     log_action("db", "Initializing database tables...")
     Base.metadata.create_all(bind=engine)
     log_action("db", "Database tables initialization complete.")
+
+    # Auto-seed default admin account if not exists
+    db = SessionLocal()
+    try:
+        admin = db.query(User).filter(User.role == "admin").first()
+        if not admin:
+            default_admin = User(
+                email=settings.ADMIN_EMAIL,
+                username=settings.ADMIN_USERNAME,
+                hashed_password=hash_password(settings.ADMIN_PASSWORD),
+                role="admin",
+                is_active=True
+            )
+            db.add(default_admin)
+            db.commit()
+            log_action("auth", f"Default admin seeded successfully: {settings.ADMIN_EMAIL} (username: {settings.ADMIN_USERNAME})")
+        else:
+            log_action("auth", f"Admin account already exists ({admin.email}).")
+    except Exception as e:
+        log_action("auth", f"Notice checking default admin account: {e}", level="warning")
+    finally:
+        db.close()
+

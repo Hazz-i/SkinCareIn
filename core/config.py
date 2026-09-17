@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440 # 24 hours
     
+    # Default Admin Seed
+    ADMIN_EMAIL: str = "admin@skincarein.com"
+    ADMIN_USERNAME: str = "admin"
+    ADMIN_PASSWORD: str = "Admin123!"
+
+    
     # CORS
     CORS_ORIGIN: str = "http://localhost:3000,http://localhost:8888"
 
