@@ -1,12 +1,11 @@
 # core/security.py
 from datetime import datetime, timedelta
 import jwt
-from passlib.context import CryptContext
-from fastapi import HTTPException, status, Depends
+import bcrypt
+from fastapi import HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from core.config import settings
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security_bearer = HTTPBearer(
     auto_error=False,
     scheme_name="BearerAuth",
@@ -14,10 +13,19 @@ security_bearer = HTTPBearer(
 )
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    """Hash plaintext password using bcrypt."""
+    pwd_bytes = password.encode('utf-8')[:72]
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(pwd_bytes, salt).decode('utf-8')
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    """Verify plaintext password against bcrypt hash."""
+    try:
+        pwd_bytes = plain_password.encode('utf-8')[:72]
+        hashed_bytes = hashed_password.encode('utf-8')
+        return bcrypt.checkpw(pwd_bytes, hashed_bytes)
+    except Exception:
+        return False
 
 def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
     to_encode = data.copy()
