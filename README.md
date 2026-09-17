@@ -275,12 +275,21 @@ SkinSight comes with interactive OpenAPI documentation accessible in any web bro
 
 All endpoints are organized under `/api/v1/`:
 
-### 1. Authentication (`/api/v1/auth`)
-- `POST /api/v1/auth/register` — Register a new standard user account.
-- `POST /api/v1/auth/login` — Authenticate and receive a JWT Bearer access token.
-- `GET /api/v1/auth/me` — Retrieve current authenticated user profile *(Requires Token)*.
+### 1. Authentication & Onboarding (`/api/v1/auth`)
+- `POST /api/v1/auth/register` — Register a new member account with 6-digit OTP code and verification email.
+- `GET /api/v1/auth/verify-email?token=...` — Verify account email via web link token.
+- `POST /api/v1/auth/verify-otp` — Verify account email via 6-digit numeric OTP code for mobile applications.
+- `POST /api/v1/auth/resend-verification` — Resend verification OTP code and email link.
+- `POST /api/v1/auth/login` — Authenticate and receive a JWT Bearer token. Enforces email verification gate.
+- `POST /api/v1/auth/onboarding` — Submit post-login dermatological onboarding data (skin type, age, gender, avoided ingredients) *(Requires Token)*.
+- `PUT /api/v1/auth/profile` — Update user profile and avoided ingredient preferences *(Requires Token)*.
+- `GET /api/v1/auth/me` — Retrieve current authenticated user profile and onboarding status *(Requires Token)*.
 
-### 2. Skincare Intelligence (`/api/v1/skincare`)
+### 2. Mobile Personalized Dashboard (`/api/v1/dashboard`)
+- `GET /api/v1/dashboard` — Main home feed aggregating user health summary, dermatological tips, medical warnings, negative ingredient filtered product recommendations, and recent news/educations *(Requires Token)*.
+
+### 3. Skincare Intelligence & Knowledge Base (`/api/v1/skincare`)
+- `GET /api/v1/skincare/ingredients-to-avoid?skin_type=...` — Query medical-grade prohibited cosmetic ingredients and care tips by skin type (`sensitive`, `oily`, `dry`, `combination`, `acne-prone`, `normal`).
 - `POST /api/v1/skincare/read-ingredients` — Extract and assess skincare ingredients from product images via **LiteLLM**.
 - `POST /api/v1/skincare/predict-skin` — Classify skin condition (`dry`, `normal`, `oily`) from facial photos via **ResNet-50**.
 - `POST /api/v1/skincare/recommendations` — Query product recommendations matching a specified skin type.

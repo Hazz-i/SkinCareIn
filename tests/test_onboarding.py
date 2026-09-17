@@ -1,13 +1,12 @@
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 from fastapi.testclient import TestClient
 from server import app
 from core.database import Base, get_db
 from models.user import User
 from core.security import create_access_token
-
-from sqlalchemy.pool import StaticPool
 
 # Test database in-memory
 test_engine = create_engine(
@@ -24,13 +23,14 @@ def override_get_db():
     finally:
         db.close()
 
-app.dependency_overrides[get_db] = override_get_db
 client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def setup_database():
     Base.metadata.create_all(bind=test_engine)
+    app.dependency_overrides[get_db] = override_get_db
     yield
+    app.dependency_overrides.clear()
     Base.metadata.drop_all(bind=test_engine)
 
 @pytest.fixture
