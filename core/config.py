@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     API_V1_PREFIX: str = "/api/v1"
-    PROJECT_NAME: str = "SkinCareIn API"
+    PROJECT_NAME: str = "SkinSight API"
     VERSION: str = "2.0.0"
     
     # Database
@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440 # 24 hours
     
     # Default Admin Seed
-    ADMIN_EMAIL: str = "admin@skincarein.com"
+    ADMIN_EMAIL: str = "admin@skinsight.com"
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "Admin123!"
 

@@ -6,9 +6,11 @@ from core.logger import format_action_log, log_action
 
 def test_settings_default_values():
     settings = Settings(
-        DATABASE_URL="postgresql://postgres:postgres@localhost:5432/skincare_db",
+        DATABASE_URL="postgresql://postgres:postgres@localhost:5432/skinsight_db",
         JWT_SECRET="test_secret_key_1234567890_min32chars"
     )
+    assert settings.PROJECT_NAME == "SkinSight API"
+    assert settings.ADMIN_EMAIL == "admin@skinsight.com"
     assert settings.API_V1_PREFIX == "/api/v1"
     assert settings.ACCESS_TOKEN_EXPIRE_MINUTES == 1440
     assert settings.LLM_MODEL == "gemini/gemini-2.5-flash"

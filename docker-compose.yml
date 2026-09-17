@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: skincare_postgres
+    container_name: skinsight_postgres
     restart: always
     environment:
       POSTGRES_USER: postgres
@@ -12,7 +12,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - skincare_network
+      - skinsight_network
 
   api1:
     build:
@@ -26,7 +26,7 @@ services:
     env_file:
       - .env
     networks:
-      - skincare_network
+      - skinsight_network
 
   api2:
     build:
@@ -40,11 +40,11 @@ services:
     env_file:
       - .env
     networks:
-      - skincare_network
+      - skinsight_network
 
   nginx:
     image: nginx:alpine
-    container_name: skincare_load_balancer
+    container_name: skinsight_load_balancer
     restart: always
     ports:
       - "8888:8888"
@@ -54,11 +54,11 @@ services:
       - api1
       - api2
     networks:
-      - skincare_network
+      - skinsight_network
 
 volumes:
   postgres_data:
 
 networks:
-  skincare_network:
+  skinsight_network:
     driver: bridge

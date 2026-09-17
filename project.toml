@@ -4,9 +4,9 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "skincarein"
+name = "skinsight"
 version = "1.0.0"
-description = "SkinSight & Skincare Intelligence API with PostgreSQL, LiteLLM, and JWT RBAC"
+description = "SkinSight Skincare Intelligence API with PostgreSQL, LiteLLM, and JWT RBAC"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

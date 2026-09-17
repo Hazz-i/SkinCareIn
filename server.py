@@ -60,11 +60,11 @@ openapi_tags = [
 ]
 
 app = FastAPI(
-    title=f"{settings.PROJECT_NAME} API",
+    title=f"{settings.PROJECT_NAME}",
     description="""
-## 🌿 SkinCareIn & SkinSight Intelligence API
+## 🌿 SkinSight Skincare Intelligence API
 
-Dokumentasi interaktif OpenAPI / Swagger UI untuk backend **SkinCareIn**.
+Dokumentasi interaktif OpenAPI / Swagger UI untuk backend **SkinSight**.
 
 ### 🚀 Fitur Arsitektur:
 - **JWT & RBAC**: Autentikasi token JWT dengan role `admin` dan `user`.
@@ -76,7 +76,7 @@ Dokumentasi interaktif OpenAPI / Swagger UI untuk backend **SkinCareIn**.
 ---
 ### 🔐 Cara Menggunakan Fitur Authorize di Swagger UI:
 1. Buka endpoint `POST /api/v1/auth/login` di bawah tag **Authentication**.
-2. Masukkan username/email dan password (contoh admin default: `admin@skincarein.com` / `Admin123!`).
+2. Masukkan username/email dan password (contoh admin default: `admin@skinsight.com` / `Admin123!`).
 3. Salin nilai `access_token` dari respons JSON.
 4. Klik tombol **Authorize** (ikon gembok) di sudut kanan atas halaman ini.
 5. Masukkan access token pada kolom yang tersedia lalu klik **Authorize**.
@@ -114,7 +114,7 @@ app.add_middleware(
 @app.get("/")
 def index():
     return {
-        "message": "SkinCareIn API is running",
+        "message": "SkinSight API is running",
         "version": settings.VERSION,
         "docs": {
             "swagger_ui": "/docs",
