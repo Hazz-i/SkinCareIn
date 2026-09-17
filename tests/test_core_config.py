@@ -1,0 +1,34 @@
+# tests/test_core_config.py
+import logging
+import pytest
+from core.config import Settings
+from core.logger import format_action_log, log_action
+
+def test_settings_default_values():
+    settings = Settings(
+        DATABASE_URL="postgresql://postgres:postgres@localhost:5432/skincare_db",
+        JWT_SECRET="test_secret_key_1234567890_min32chars"
+    )
+    assert settings.API_V1_PREFIX == "/api/v1"
+    assert settings.ACCESS_TOKEN_EXPIRE_MINUTES == 1440
+    assert settings.LLM_MODEL == "gemini/gemini-2.5-flash"
+
+def test_cors_origins_list():
+    settings = Settings(
+        CORS_ORIGIN="http://localhost:3000,http://localhost:8888, "
+    )
+    assert settings.cors_origins_list == ["http://localhost:3000", "http://localhost:8888"]
+
+def test_format_action_log():
+    log_msg = format_action_log("scrap", "Fetching articles from Kompas")
+    assert log_msg.startswith("[scrap]")
+    assert "Fetching articles from Kompas" in log_msg
+
+def test_log_action_levels(caplog):
+    with caplog.at_level(logging.INFO):
+        log_action("scrap", "Scraping started", level="info")
+        log_action("db", "Connection warning", level="warning")
+        log_action("auth", "Invalid token", level="error")
+    assert "[scrap] Scraping started" in caplog.text
+    assert "[db] Connection warning" in caplog.text
+    assert "[auth] Invalid token" in caplog.text
