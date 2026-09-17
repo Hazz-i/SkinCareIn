@@ -15,11 +15,14 @@ RUN apt-get update && apt-get install -y \
     libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY pyproject.toml project.toml* ./
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    python -c "import tomllib; reqs = tomllib.load(open('pyproject.toml', 'rb'))['project']['dependencies']; open('requirements.tmp', 'w').write('\n'.join(reqs))" && \
+    pip install --no-cache-dir -r requirements.tmp && \
+    rm requirements.tmp
 
 COPY . .
+RUN pip install --no-cache-dir --no-deps .
 
 EXPOSE 8000
 

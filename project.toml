@@ -1,0 +1,80 @@
+# project.toml (Mirroring pyproject.toml)
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skincarein"
+version = "1.0.0"
+description = "SkinSight & Skincare Intelligence API with PostgreSQL, LiteLLM, and JWT RBAC"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    # Core API framework
+    "fastapi>=0.115.0",
+    "uvicorn>=0.35.0",
+    "python-multipart>=0.0.20",
+
+    # Environment and config
+    "python-dotenv>=1.1.0",
+    "pydantic-settings>=2.2.0",
+
+    # Data processing and ML
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "scikit-learn>=1.4.0",
+
+    # Database
+    "SQLAlchemy>=2.0.0",
+    "PyMySQL>=1.1.0",
+    "psycopg2-binary>=2.9.9",
+
+    # Google AI & LLM
+    "google-genai>=1.24.0",
+    "litellm>=1.40.0",
+
+    # Image processing
+    "opencv-python>=4.8.0",
+    "pillow>=10.0.0",
+
+    # Deep learning
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+
+    # HTTP requests
+    "requests>=2.31.0",
+    "httpx>=0.27.0",
+
+    # Data validation
+    "pydantic>=2.7.0",
+
+    # Beautiful Soup for HTML parsing
+    "beautifulsoup4>=4.12.0",
+
+    # Background Scheduler & Rate Limiting
+    "apscheduler>=3.10.4",
+    "slowapi>=0.1.9",
+
+    # Security & Auth
+    "passlib[bcrypt]>=1.7.4",
+    "pyjwt>=2.8.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[tool.setuptools]
+packages = [
+    "core",
+    "helper",
+    "models",
+    "routers",
+    "scheduler",
+    "schemas",
+    "services",
+    "utils",
+]
+py-modules = ["server", "seed_db"]
