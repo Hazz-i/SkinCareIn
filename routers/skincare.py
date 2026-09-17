@@ -1,11 +1,12 @@
 # routers/skincare.py
-from fastapi import APIRouter, File, UploadFile, Form
+from fastapi import APIRouter, File, UploadFile, Form, Query
 from schemas.skincare import (
     SkinTypeEnum, ReadIngredientsResponse, PredictSkinResponse,
     RecommendationsRequest, RecommendationsResponse
 )
 from services.skincare_service import SkincareService
 from helper.recommendations import get_skin_type_recommendations
+from helper.ingredients import get_avoided_ingredients_for_skin, get_skin_health_tips
 
 router = APIRouter(tags=["Skincare Analysis & Recommender"])
 
@@ -35,4 +36,15 @@ def get_recommendations(request: RecommendationsRequest):
         "total_found": recs.get("total_found", 0),
         "skin_type": request.skin_type,
         "recommendation_count": recs.get("recommendation_count", 0)
+    }
+
+@router.get("/ingredients-to-avoid", summary="Get Prohibited Ingredients & Care Tips by Skin Type")
+def get_ingredients_to_avoid(
+    skin_type: str = Query(..., description="Skin classification (sensitive, oily, dry, combination, acne-prone, normal)")
+):
+    """Retrieve curated prohibited cosmetic ingredients and clinical tips tailored for specific skin types."""
+    return {
+        "skin_type": skin_type,
+        "exceptions": get_avoided_ingredients_for_skin(skin_type),
+        "tips": get_skin_health_tips(skin_type)
     }
