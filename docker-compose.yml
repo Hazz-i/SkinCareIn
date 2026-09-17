@@ -1,18 +1,64 @@
 services:
-  web:
+  postgres:
+    image: postgres:16-alpine
+    container_name: skincare_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: skinsight_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - skincare_network
+
+  api1:
     build:
       context: .
       dockerfile: dockerfile
-    ports:
-      - "8888:8888"
-    networks:
-      - skinsight-net
+    restart: always
+    depends_on:
+      - postgres
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgrespassword@postgres:5432/skinsight_db
     env_file:
       - .env
+    networks:
+      - skincare_network
+
+  api2:
+    build:
+      context: .
+      dockerfile: dockerfile
+    restart: always
+    depends_on:
+      - postgres
     environment:
-      - DB_HOST=mysql_server
-      - DB_PORT=${DB_PORT}
+      - DATABASE_URL=postgresql://postgres:postgrespassword@postgres:5432/skinsight_db
+    env_file:
+      - .env
+    networks:
+      - skincare_network
+
+  nginx:
+    image: nginx:alpine
+    container_name: skincare_load_balancer
+    restart: always
+    ports:
+      - "8888:8888"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api1
+      - api2
+    networks:
+      - skincare_network
+
+volumes:
+  postgres_data:
 
 networks:
-  skinsight-net:
-    external: true
+  skincare_network:
+    driver: bridge
