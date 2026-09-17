@@ -11,7 +11,7 @@ api_router = APIRouter()
 
 @api_router.get("/health", tags=["Health"], summary="Health Check Service")
 def health_check():
-    """Memeriksa status operasional service backend dan versi rilis."""
+    """Check backend service operational status and release version."""
     return {
         "status": "ok",
         "service": settings.PROJECT_NAME,

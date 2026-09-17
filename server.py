@@ -35,27 +35,27 @@ from fastapi.responses import RedirectResponse
 openapi_tags = [
     {
         "name": "Authentication",
-        "description": "Registrasi, login, dan manajemen profil pengguna dengan otentikasi JWT Bearer token dan Role-Based Access Control (RBAC: `admin` & `user`).",
+        "description": "User registration, login, and profile management with JWT Bearer authentication and Role-Based Access Control (RBAC: `admin` & `user`).",
     },
     {
         "name": "Skincare Analysis & Recommender",
-        "description": "Analisis komposisi bahan skincare via **LiteLLM**, prediksi tipe kulit wajah via **ResNet-50**, dan rekomendasi katalog produk.",
+        "description": "Ingredient extraction & safety analysis via **LiteLLM**, facial skin type classification via **ResNet-50**, and personalized catalog recommendations.",
     },
     {
         "name": "Skincare News",
-        "description": "Daftar artikel berita kecantikan dengan auto-caching PostgreSQL (sinkronisasi harian 24 jam) dan lazy detail scraping 1x.",
+        "description": "Curated skincare and dermatology news with PostgreSQL caching (24-hour periodic sync) and 1-time lazy detail scraping.",
     },
     {
         "name": "Skincare Educations",
-        "description": "Daftar artikel edukasi dermatologi dan bahan aktif dengan auto-caching PostgreSQL dan lazy detail scraping 1x.",
+        "description": "Dermatological education guides and active ingredient topics with PostgreSQL caching and on-demand lazy scraping.",
     },
     {
         "name": "Admin Operations",
-        "description": "Operasi khusus Administrator untuk memicu re-sinkronisasi scraping artikel secara manual (Memerlukan role `admin`).",
+        "description": "Administrative maintenance endpoints to manually trigger article resynchronization (Requires `admin` role).",
     },
     {
         "name": "Health",
-        "description": "Health check endpoint untuk load balancer Nginx dan pemantauan status service.",
+        "description": "Health check endpoint for Nginx reverse proxy load balancer and uptime monitoring.",
     },
 ]
 
@@ -64,23 +64,23 @@ app = FastAPI(
     description="""
 ## 🌿 SkinSight Skincare Intelligence API
 
-Dokumentasi interaktif OpenAPI / Swagger UI untuk backend **SkinSight**.
+Interactive OpenAPI / Swagger UI documentation for the **SkinSight** backend services.
 
-### 🚀 Fitur Arsitektur:
-- **JWT & RBAC**: Autentikasi token JWT dengan role `admin` dan `user`.
-- **LiteLLM**: Integrasi multi-model AI vision dan LLM dengan auto-fallback.
-- **Lazy & Cron Caching**: Data berita & edukasi di-cache dalam PostgreSQL, disinkronisasi harian (24 jam), dan detail artikel di-scrape 1x saat pertama kali diakses.
-- **Nginx Load Balancer**: Akses melalui reverse proxy port `8888` terdistribusi ke multiple API node (`api1`, `api2`).
-- **SlowAPI Rate Limiting**: Proteksi endpoint dari request abuse.
+### 🚀 Key Architectural Features:
+- **JWT & Role-Based Access Control**: Secure authentication with `admin` and `user` privilege levels.
+- **LiteLLM Multi-Model Orchestration**: Vision and LLM analysis with automated model fallback (Gemini 2.5 Flash -> Gemini 1.5 Flash).
+- **Two-Tier Database Caching**: Article list feeds synced every 24 hours into PostgreSQL; full article content scraped once on-demand and cached permanently.
+- **High-Availability Load Balancer**: Nginx reverse proxy on port `8888` distributing traffic across containerized API workers.
+- **SlowAPI Rate Limiting**: Built-in rate limiting per IP to protect services from abusive traffic.
 
 ---
-### 🔐 Cara Menggunakan Fitur Authorize di Swagger UI:
-1. Buka endpoint `POST /api/v1/auth/login` di bawah tag **Authentication**.
-2. Masukkan username/email dan password (contoh admin default: `admin@skinsight.com` / `Admin123!`).
-3. Salin nilai `access_token` dari respons JSON.
-4. Klik tombol **Authorize** (ikon gembok) di sudut kanan atas halaman ini.
-5. Masukkan access token pada kolom yang tersedia lalu klik **Authorize**.
-6. Anda sekarang dapat langsung mengeksekusi endpoint khusus admin atau user terproteksi!
+### 🔐 How to Authorize in Swagger UI:
+1. Navigate to `POST /api/v1/auth/login` under the **Authentication** section.
+2. Provide valid credentials (e.g., default admin: `admin@skinsight.com` / `Admin123!`).
+3. Copy the `access_token` string from the JSON response.
+4. Click the green **Authorize** padlock button at the top right of this page.
+5. Paste the access token into the input box and click **Authorize**.
+6. All protected user and admin endpoints are now unlocked for testing directly in this UI!
     """,
     version=settings.VERSION,
     openapi_tags=openapi_tags,

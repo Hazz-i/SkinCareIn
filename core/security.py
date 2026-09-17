@@ -10,7 +10,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security_bearer = HTTPBearer(
     auto_error=False,
     scheme_name="BearerAuth",
-    description="Masukkan JWT access token (format: Bearer <token>)"
+    description="Enter JWT access token (format: Bearer <token>)"
 )
 
 def hash_password(password: str) -> str:
@@ -32,6 +32,6 @@ def decode_access_token(token: str) -> dict:
     except jwt.PyJWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token tidak valid atau telah kedaluwarsa.",
+            detail="Token is invalid or has expired.",
             headers={"WWW-Authenticate": "Bearer"}
         )
