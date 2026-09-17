@@ -5,6 +5,7 @@ from routers.skincare import router as skincare_router
 from routers.news import router as news_router
 from routers.educations import router as educations_router
 from routers.admin import router as admin_router
+from routers.dashboard import router as dashboard_router
 from core.config import settings
 
 api_router = APIRouter()
@@ -19,6 +20,7 @@ def health_check():
     }
 
 api_router.include_router(auth_router, prefix="/auth")
+api_router.include_router(dashboard_router, prefix="/dashboard")
 api_router.include_router(skincare_router, prefix="/skincare")
 api_router.include_router(news_router, prefix="/news")
 api_router.include_router(educations_router, prefix="/educations")
