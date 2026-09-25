@@ -1,6 +1,6 @@
 # models/user.py
 from datetime import datetime, timezone
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, JSON
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, JSON
 from core.database import Base
 
 class User(Base):
@@ -14,6 +14,7 @@ class User(Base):
     # Profile & Demographic Information
     first_name = Column(String(100), nullable=True)
     last_name = Column(String(100), nullable=True)
+    date_of_birth = Column(Date, nullable=True)
     age = Column(Integer, nullable=True)
     gender = Column(String(20), nullable=True) # "male", "female", "other"
     

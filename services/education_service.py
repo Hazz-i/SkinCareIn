@@ -1,23 +1,38 @@
 # services/education_service.py
-from datetime import datetime
+from datetime import datetime, timedelta
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from models.education import EducationArticle, EducationArticleDetail
 from helper.educations import get_educations_list, get_educations_details
 from core.logger import log_action
 from fastapi import HTTPException
 
+# Cached content is refreshed at most once per day.
+SYNC_TTL_HOURS = 24
+
+# Safety cap so a runaway pagination loop can never hammer the source.
+MAX_SYNC_PAGES = 10
+
 class EducationService:
     @staticmethod
-    def sync_educations_from_source(db: Session, max_pages: int = 2) -> int:
-        log_action("scrap", f"Starting background sync of education topics (pages 1 to {max_pages})...")
+    def sync_educations_from_source(
+        db: Session, max_pages: int = 2, until_exhausted: bool = False
+    ) -> int:
+        """Scrape Lab Muffin pages and upsert them. With `until_exhausted`, keep paging
+        until a page returns no articles or the page cap is reached."""
+        log_action("scrap", f"Starting background sync of education topics (up to {max_pages} pages)...")
         synced_count = 0
         for page in range(1, max_pages + 1):
             try:
                 scraped_data, _ = get_educations_list(page_number=page)
             except Exception as e:
                 log_action("scrap", f"Error scraping education page {page}: {e}", level="warning")
-                scraped_data = []
-            
+                break
+
+            if not scraped_data:
+                # No articles on this page -> reached the end of the archive.
+                break
+
             for item in scraped_data:
                 link = item.get("Link")
                 if not link:
@@ -50,8 +65,15 @@ class EducationService:
     @staticmethod
     def get_cached_educations_list(db: Session, page: int = 1, page_size: int = 15) -> dict:
         total = db.query(EducationArticle).count()
-        if total == 0:
-            EducationService.sync_educations_from_source(db, max_pages=1)
+        latest = db.query(func.max(EducationArticle.fetched_at)).scalar()
+
+        # Refresh once the TTL window has elapsed, not only when the table is empty.
+        is_stale = latest is None or (datetime.utcnow() - latest) > timedelta(hours=SYNC_TTL_HOURS)
+        if total == 0 or is_stale:
+            # Walk the whole archive (not just page 1) so later pages are cached too.
+            EducationService.sync_educations_from_source(
+                db, max_pages=MAX_SYNC_PAGES, until_exhausted=True
+            )
             total = db.query(EducationArticle).count()
 
         offset = (page - 1) * page_size

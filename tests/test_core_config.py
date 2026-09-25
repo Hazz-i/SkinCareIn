@@ -4,7 +4,26 @@ import pytest
 from core.config import Settings
 from core.logger import format_action_log, log_action
 
-def test_settings_default_values():
+def test_settings_default_values(tmp_path, monkeypatch):
+    # Settings resolves `.env` relative to the cwd, and importing LiteLLM calls load_dotenv()
+    # (which pushes .env into os.environ). Blank both sources so this asserts the real class
+    # defaults instead of whatever the local machine happens to be configured with.
+    monkeypatch.chdir(tmp_path)
+    for key in (
+        "PROJECT_NAME",
+        "API_V1_PREFIX",
+        "ADMIN_EMAIL",
+        "ADMIN_USERNAME",
+        "ADMIN_PASSWORD",
+        "ACCESS_TOKEN_EXPIRE_MINUTES",
+        "LLM_MODEL",
+        "LLM_FALLBACKS",
+        "LLM_API_BASE",
+        "LLM_API_KEY",
+        "GEMINI_API_KEY",
+    ):
+        monkeypatch.delenv(key, raising=False)
+
     settings = Settings(
         DATABASE_URL="postgresql://postgres:postgres@localhost:5432/skinsight_db",
         JWT_SECRET="test_secret_key_1234567890_min32chars"
@@ -14,6 +33,7 @@ def test_settings_default_values():
     assert settings.API_V1_PREFIX == "/api/v1"
     assert settings.ACCESS_TOKEN_EXPIRE_MINUTES == 1440
     assert settings.LLM_MODEL == "gemini/gemini-2.5-flash"
+    assert settings.LLM_API_BASE == ""
 
 def test_cors_origins_list():
     settings = Settings(

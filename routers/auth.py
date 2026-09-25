@@ -14,7 +14,12 @@ from schemas.auth import (
     VerifyOTPRequest,
     ResendVerificationRequest,
     OnboardingRequest,
-    UpdateProfileRequest
+    UpdateProfileRequest,
+    ForgotPasswordRequest,
+    ResetOTPRequest,
+    ResetPasswordRequest,
+    ResetTokenResponse,
+    MessageResponse
 )
 from services.auth_service import AuthService
 from core.logger import log_action
@@ -99,3 +104,21 @@ def update_profile(
 def get_me(user: User = Depends(get_current_user)):
     """Retrieve profile data and onboarding status for the currently authenticated user."""
     return user
+
+
+@router.post("/forgot-password", response_model=MessageResponse, summary="Request Password Reset Code")
+def forgot_password(request: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """Send a 6-digit password reset code to a registered email address."""
+    return AuthService.forgot_password(db, request)
+
+
+@router.post("/verify-reset-otp", response_model=ResetTokenResponse, summary="Verify Password Reset Code")
+def verify_reset_otp(request: ResetOTPRequest, db: Session = Depends(get_db)):
+    """Validate the password reset code and return a short-lived reset token."""
+    return AuthService.verify_reset_otp(db, request)
+
+
+@router.post("/reset-password", response_model=MessageResponse, summary="Reset Password with Token")
+def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """Set a new password using the token returned by /verify-reset-otp."""
+    return AuthService.reset_password(db, request)

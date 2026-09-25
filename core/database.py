@@ -17,12 +17,28 @@ def get_db():
     finally:
         db.close()
 
+def _ensure_schema_upgrades():
+    """Apply additive column migrations that `create_all` cannot handle on existing tables."""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+    if "users" not in inspector.get_table_names():
+        return
+
+    existing_columns = {column["name"] for column in inspector.get_columns("users")}
+    if "date_of_birth" not in existing_columns:
+        with engine.begin() as connection:
+            connection.execute(text("ALTER TABLE users ADD COLUMN date_of_birth DATE"))
+        log_action("db", "Migrated users table: added date_of_birth column.")
+
+
 def init_db():
     from models.user import User
     from core.security import hash_password
 
     log_action("db", "Initializing database tables...")
     Base.metadata.create_all(bind=engine)
+    _ensure_schema_upgrades()
     log_action("db", "Database tables initialization complete.")
 
     # Hardcoded default administrator credentials

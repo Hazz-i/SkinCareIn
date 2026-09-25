@@ -14,4 +14,5 @@ class Product(Base):
     link = Column(Text, nullable=True)
     ingredients = Column(Text, nullable=True)
     type = Column(String(100), nullable=True)
+    brand = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

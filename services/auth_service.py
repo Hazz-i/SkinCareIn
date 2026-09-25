@@ -2,6 +2,9 @@
 import secrets
 import random
 from datetime import datetime, timedelta
+from typing import Optional
+
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from models.user import User
@@ -11,17 +14,29 @@ from schemas.auth import (
     VerifyOTPRequest,
     ResendVerificationRequest,
     OnboardingRequest,
-    UpdateProfileRequest
+    UpdateProfileRequest,
+    ForgotPasswordRequest,
+    ResetOTPRequest,
+    ResetPasswordRequest
 )
 from services.email_service import EmailService
+from core.config import settings
 from core.security import hash_password, verify_password, create_access_token
 from core.logger import log_action
+
+
+def _find_user_by_email(db: Session, email: str) -> Optional[User]:
+    """Look a user up case-insensitively — people type their address with any casing."""
+    if not email:
+        return None
+    return db.query(User).filter(func.lower(User.email) == email.strip().lower()).first()
+
 
 class AuthService:
     @staticmethod
     def register_user(db: Session, request: UserRegisterRequest) -> dict:
         """Register a new member with 6-digit OTP and email verification link."""
-        if db.query(User).filter(User.email == request.email).first():
+        if _find_user_by_email(db, request.email):
             log_action("auth", f"Registration failed: email {request.email} already registered", level="warning")
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email is already registered.")
         
@@ -35,7 +50,7 @@ class AuthService:
         otp_expires_at = datetime.utcnow() + timedelta(minutes=15)
 
         new_user = User(
-            email=request.email,
+            email=request.email.strip().lower(),
             username=request.username,
             hashed_password=hash_password(request.password),
             role=assigned_role,
@@ -87,13 +102,27 @@ class AuthService:
     @staticmethod
     def verify_otp(db: Session, request: VerifyOTPRequest) -> dict:
         """Verify user email via 6-digit numeric OTP code."""
-        user = db.query(User).filter(User.email == request.email).first()
+        user = _find_user_by_email(db, request.email)
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
 
         if user.is_verified:
             return {
                 "message": "Email is already verified.",
+                "email": user.email,
+                "is_verified": True
+            }
+
+        # Local/dev has no real inbox, so any 6-digit code is accepted.
+        if not settings.email_verification_required:
+            user.is_verified = True
+            user.verification_token = None
+            user.verification_otp = None
+            user.otp_expires_at = None
+            db.commit()
+            log_action("auth", f"OTP verification bypassed in {settings.APP_ENV} env for {user.email}")
+            return {
+                "message": "Email successfully verified. You can now log in to your account.",
                 "email": user.email,
                 "is_verified": True
             }
@@ -122,7 +151,7 @@ class AuthService:
     @staticmethod
     def resend_verification(db: Session, request: ResendVerificationRequest) -> dict:
         """Regenerate and resend verification code and link."""
-        user = db.query(User).filter(User.email == request.email).first()
+        user = _find_user_by_email(db, request.email)
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
 
@@ -149,7 +178,7 @@ class AuthService:
     @staticmethod
     def authenticate_user(db: Session, request: UserLoginRequest) -> dict:
         """Authenticate user credentials and enforce email verification gate."""
-        user = db.query(User).filter(User.email == request.email).first()
+        user = _find_user_by_email(db, request.email)
         if not user or not user.hashed_password or not verify_password(request.password, user.hashed_password):
             log_action("auth", f"Invalid login credentials for email: {request.email}", level="warning")
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
@@ -157,13 +186,18 @@ class AuthService:
         if not user.is_active:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account is inactive.")
         
-        # Enforce email verification gate
+        # Enforce the email verification gate. On local/dev it is relaxed so a freshly
+        # registered account can sign straight in (and is marked verified from then on).
         if not user.is_verified:
-            log_action("auth", f"Login blocked - unverified email: {user.email}", level="warning")
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Email not verified. Please verify your email using the OTP code sent to your inbox."
-            )
+            if settings.email_verification_required:
+                log_action("auth", f"Login blocked - unverified email: {user.email}", level="warning")
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Email not verified. Please verify your email using the OTP code sent to your inbox."
+                )
+            user.is_verified = True
+            db.commit()
+            log_action("auth", f"Email verification gate bypassed in {settings.APP_ENV} env for {user.email}")
         
         token = create_access_token(data={
             "sub": str(user.id),
@@ -184,6 +218,8 @@ class AuthService:
         """Save onboarding dermatological attributes and mark user as onboarded."""
         user.first_name = request.first_name
         user.last_name = request.last_name
+        if request.date_of_birth is not None:
+            user.date_of_birth = request.date_of_birth
         user.age = request.age
         user.gender = request.gender
         user.skin_type = request.skin_type
@@ -202,6 +238,8 @@ class AuthService:
             user.first_name = request.first_name
         if request.last_name is not None:
             user.last_name = request.last_name
+        if request.date_of_birth is not None:
+            user.date_of_birth = request.date_of_birth
         if request.age is not None:
             user.age = request.age
         if request.gender is not None:
@@ -215,3 +253,99 @@ class AuthService:
         db.refresh(user)
         log_action("auth", f"Profile updated for user {user.email}")
         return user
+
+
+    @staticmethod
+    def forgot_password(db: Session, request: ForgotPasswordRequest) -> dict:
+        """Issue a 6-digit password reset code for a verified local account."""
+        user = _find_user_by_email(db, request.email)
+
+        # Never reveal whether the address is registered.
+        if not user:
+            log_action("auth", f"Password reset requested for unknown email: {request.email}", level="warning")
+            return {
+                "message": "If that email is registered, a reset code has been sent.",
+                "email": request.email
+            }
+
+        if user.auth_provider != "local":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="This account signs in with Google and has no password to reset."
+            )
+
+        reset_token = secrets.token_urlsafe(32)
+        reset_otp = f"{random.randint(0, 999999):06d}"
+
+        user.verification_token = reset_token
+        user.verification_otp = reset_otp
+        user.otp_expires_at = datetime.utcnow() + timedelta(minutes=15)
+        db.commit()
+
+        EmailService.send_password_reset_email(user.email, reset_otp)
+        log_action("auth", f"Password reset code issued for {user.email}")
+
+        return {
+            "message": "If that email is registered, a reset code has been sent.",
+            "email": user.email
+        }
+
+    @staticmethod
+    def verify_reset_otp(db: Session, request: ResetOTPRequest) -> dict:
+        """Validate the password reset OTP and hand back the reset token."""
+        user = _find_user_by_email(db, request.email)
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+        if not user.verification_otp or user.verification_otp != request.otp:
+            log_action("auth", f"Invalid password reset OTP for {request.email}", level="warning")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid reset code.")
+
+        if user.otp_expires_at and user.otp_expires_at < datetime.utcnow():
+            log_action("auth", f"Expired password reset OTP for {request.email}", level="warning")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Reset code has expired. Please request a new code."
+            )
+
+        if not user.verification_token:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Reset session is invalid. Please request a new code."
+            )
+
+        log_action("auth", f"Password reset OTP verified for {user.email}")
+        return {
+            "message": "Reset code verified. You can now choose a new password.",
+            "email": user.email,
+            "reset_token": user.verification_token
+        }
+
+    @staticmethod
+    def reset_password(db: Session, request: ResetPasswordRequest) -> dict:
+        """Persist a new password for a validated reset session."""
+        user = _find_user_by_email(db, request.email)
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+        if not user.verification_token or user.verification_token != request.reset_token:
+            log_action("auth", f"Invalid password reset token for {request.email}", level="warning")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Reset session is invalid or has expired."
+            )
+
+        if user.otp_expires_at and user.otp_expires_at < datetime.utcnow():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Reset session has expired. Please request a new code."
+            )
+
+        user.hashed_password = hash_password(request.new_password)
+        user.verification_token = None
+        user.verification_otp = None
+        user.otp_expires_at = None
+        db.commit()
+
+        log_action("auth", f"Password reset completed for {user.email}")
+        return {"message": "Password updated successfully. You can now sign in.", "email": user.email}

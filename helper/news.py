@@ -7,6 +7,7 @@ Supports infinite scroll pagination (skip/limit) and full article/glossary detai
 import urllib.request
 import urllib.parse
 import json
+from datetime import datetime
 import re
 from typing import List, Dict, Any, Optional
 from scrapling import Selector, Fetcher
@@ -109,32 +110,53 @@ def _html_to_markdown(html_content: str) -> str:
 
     return markdown_text
 
+def _normalise_date(raw: str) -> str:
+    """Return YYYY-MM-DD for the several date formats the BeautyJournal API emits."""
+    if not raw:
+        return ""
+
+    cleaned = raw.strip()
+    for fmt in ("%d %B %Y %H:%M:%S", "%d %B %Y", "%d %b %Y %H:%M:%S", "%d %b %Y"):
+        try:
+            return datetime.strptime(cleaned, fmt).strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+
+    iso = re.match(r"(\d{4}-\d{2}-\d{2})", cleaned)
+    if iso:
+        return iso.group(1)
+
+    return cleaned[:10]
+
+
 def get_news_list(page: int = 1, page_size: int = 15) -> Dict[str, Any]:
     """
     Retrieve BeautyJournal skincare news & beauty A-Z items.
     Handles the infinite scroll mechanism using skip & limit query parameters.
     """
     skip = (page - 1) * page_size
-    api_url = f"{API_BASE}/glossary?limit={page_size}&skip={skip}"
+    api_url = f"{API_BASE}/posts?limit={page_size}&skip={skip}"
     log_action("scrap", f"Fetching BeautyJournal infinite scroll feed (page={page}, skip={skip}, limit={page_size}) via Scrapling...")
 
     data = _fetch_api_json(api_url)
     article_list = []
 
     if data and data.get("success"):
-        groups = data.get("data", {})
-        # Data is returned as dictionary of alphabetical groups e.g. {"#": [...], "A": [...]}
-        for _, items in groups.items():
-            for item in items:
+        payload = data.get("data", [])
+        # /posts returns a flat list; keep backwards compatibility if a grouped payload appears.
+        if isinstance(payload, dict):
+            payload = [entry for group in payload.values() for entry in group]
+        for item in payload:
                 title = item.get("title", "").strip()
                 slug = item.get("slug", "").strip()
                 if not title or not slug:
                     continue
 
-                link = f"https://www.beautyjournal.id/beauty-az/{slug}"
+                link = f"https://www.beautyjournal.id/article/{slug}"
                 
-                # Extract image
-                images = item.get("images") or []
+                # Extract image. The /posts payload exposes media as `attachments`
+                # (the old glossary endpoint used `images`), so check both.
+                images = item.get("attachments") or item.get("images") or []
                 img_url = DEFAULT_COVER
                 for img_obj in images:
                     if isinstance(img_obj, dict) and img_obj.get("url"):
@@ -142,9 +164,9 @@ def get_news_list(page: int = 1, page_size: int = 15) -> Dict[str, Any]:
                         if img_obj.get("is_cover"):
                             break
 
-                # Extract date
+                # Extract date. published_at looks like "17 September 2026 08:33:34".
                 raw_date = str(item.get("published_at") or item.get("created_at") or "")
-                date_str = raw_date[:10] if raw_date else ""
+                date_str = _normalise_date(raw_date)
 
                 # Extract category / tag
                 tags = item.get("tags") or []
@@ -234,7 +256,16 @@ def get_news(url: str) -> List[Dict[str, Any]]:
         title = p.get("title", "")
         author = p.get("owner", {}).get("name", "Beauty Journal Editorial") if isinstance(p.get("owner"), dict) else "Beauty Journal Editorial"
         date_str = str(p.get("published_at", ""))[:10]
-        cover_image = p.get("attachments", {}).get("featured_image", DEFAULT_COVER) if isinstance(p.get("attachments"), dict) else DEFAULT_COVER
+        _attachment = p.get("attachments")
+        cover_image = DEFAULT_COVER
+        if isinstance(_attachment, list):
+            for _img in _attachment:
+                if isinstance(_img, dict) and _img.get("url"):
+                    cover_image = _img["url"]
+                    if _img.get("is_cover"):
+                        break
+        elif isinstance(_attachment, dict):
+            cover_image = _attachment.get("featured_image") or DEFAULT_COVER
         raw_html = p.get("content", "")
         markdown_content = _html_to_markdown(raw_html)
 

@@ -38,6 +38,25 @@ class PredictSkinResponse(BaseModel):
     oily: float
     predicted_label: str
 
+class AnalyzedIngredient(BaseModel):
+    name: str
+    rating: str
+    purpose: str
+
+class AnalyzeProductRequest(BaseModel):
+    ingredients: str
+    skin_type: SkinTypeEnum
+
+class AnalyzeProductResponse(BaseModel):
+    skin_type: str
+    has_ingredients: bool
+    is_safe: bool
+    safety_score: int
+    analyzed_ingredients: List[AnalyzedIngredient] = []
+    harmful_ingredients: List[HarmfulIngredientDetail] = []
+    tips: List[str] = []
+    message: Optional[str] = None
+
 class RecommendationsRequest(BaseModel):
     skin_type: SkinTypeEnum
     top_k: int = Field(default=10, ge=1, le=20)

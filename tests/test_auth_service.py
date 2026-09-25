@@ -12,6 +12,7 @@ from schemas.auth import (
     ResendVerificationRequest
 )
 from services.auth_service import AuthService
+from core.config import settings
 
 # Use in-memory SQLite database for unit testing
 engine = create_engine("sqlite:///:memory:")
@@ -22,6 +23,16 @@ def setup_db():
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
+
+@pytest.fixture
+def production_env(monkeypatch):
+    """Email verification is mandatory — the behaviour a real deployment must have."""
+    monkeypatch.setattr(settings, "APP_ENV", "production")
+
+@pytest.fixture
+def local_env(monkeypatch):
+    """Development mode: no real inbox, so the verification step is relaxed."""
+    monkeypatch.setattr(settings, "APP_ENV", "local")
 
 def test_register_creates_unverified_member_with_otp():
     db = TestingSessionLocal()
@@ -44,7 +55,7 @@ def test_register_creates_unverified_member_with_otp():
     assert user.verification_token is not None
     db.close()
 
-def test_login_blocked_if_unverified():
+def test_login_blocked_if_unverified(production_env):
     db = TestingSessionLocal()
     req = UserRegisterRequest(
         email="unverified@example.com",
@@ -91,7 +102,7 @@ def test_verify_otp_success_and_login_allowed():
     assert auth_data["role"] == "member"
     db.close()
 
-def test_verify_otp_expired():
+def test_verify_otp_expired(production_env):
     db = TestingSessionLocal()
     req = UserRegisterRequest(
         email="expired@example.com",
@@ -128,4 +139,42 @@ def test_resend_verification():
 
     db.refresh(user)
     assert user.verification_token != first_token
+    db.close()
+
+def test_local_env_accepts_any_otp(local_env):
+    db = TestingSessionLocal()
+    AuthService.register_user(db, UserRegisterRequest(
+        email="localuser@example.com",
+        username="localuser",
+        password="Password123!"
+    ))
+    user = db.query(User).filter(User.email == "localuser@example.com").first()
+    real_otp = user.verification_otp
+    wrong_otp = "000000" if real_otp != "000000" else "111111"
+
+    result = AuthService.verify_otp(
+        db, VerifyOTPRequest(email="localuser@example.com", otp=wrong_otp)
+    )
+    assert result["is_verified"] is True
+
+    db.refresh(user)
+    assert user.is_verified is True
+    db.close()
+
+def test_local_env_login_skips_verification_gate(local_env):
+    db = TestingSessionLocal()
+    AuthService.register_user(db, UserRegisterRequest(
+        email="localflow@example.com",
+        username="localflow",
+        password="Password123!"
+    ))
+
+    # No OTP verification call at all — signing in must still work on a local env.
+    auth_data = AuthService.authenticate_user(
+        db, UserLoginRequest(email="localflow@example.com", password="Password123!")
+    )
+    assert "access_token" in auth_data
+
+    user = db.query(User).filter(User.email == "localflow@example.com").first()
+    assert user.is_verified is True
     db.close()

@@ -2,7 +2,8 @@
 from fastapi import APIRouter, File, UploadFile, Form, Query
 from schemas.skincare import (
     SkinTypeEnum, ReadIngredientsResponse, PredictSkinResponse,
-    RecommendationsRequest, RecommendationsResponse
+    RecommendationsRequest, RecommendationsResponse,
+    AnalyzeProductRequest, AnalyzeProductResponse,
 )
 from services.skincare_service import SkincareService
 from helper.recommendations import get_skin_type_recommendations
@@ -26,6 +27,11 @@ async def predict_skin(
 ):
     """Predict skin type (dry, normal, oily) from facial photograph using ResNet-50 deep learning model."""
     return await SkincareService.predict_skin(file, image_url)
+
+@router.post("/analyze-product", response_model=AnalyzeProductResponse, summary="Analyze Catalog Product Ingredients (Rule-based)")
+def analyze_product(request: AnalyzeProductRequest):
+    """Match a catalog product's ingredient list against the user's skin type and return a safety breakdown."""
+    return SkincareService.analyze_product_ingredients(request.ingredients, request.skin_type.value)
 
 @router.post("/recommendations", response_model=RecommendationsResponse, summary="Product Recommendations by Skin Type")
 def get_recommendations(request: RecommendationsRequest):

@@ -92,14 +92,14 @@ ingredients_avoid_oily = [
 ingredients_avoid_dry = [
     "Alcohol Denat", "Ethanol", "SD Alcohol", "Isopropyl Alcohol",
     "Fragrance", "Menthol", "Camphor", "Witch Hazel", "Sodium Lauryl Sulfate",
-    "Benzoyl Peroxide", "Retinol (tanpa moisturizer)", "Clay", "Charcoal",
-    "Salicylic Acid (dalam kadar tinggi)", "AHA/BHA"
+    "Benzoyl Peroxide", "Retinol (without a moisturizer)", "Clay", "Charcoal",
+    "Salicylic Acid (high concentration)", "AHA/BHA"
 ]
 
 ingredients_avoid_normal = [
     "Fragrance", "Essential Oils (Tea Tree, Peppermint, Citrus Oils)",
     "Alcohol Denat", "Sodium Lauryl Sulfate", "Harsh Exfoliants (Walnut Shells, Apricot Scrub)",
-    "Synthetic Dyes", "Bismuth Oxychloride", "Parabens (bagi yang sensitif)"
+    "Synthetic Dyes", "Bismuth Oxychloride", "Parabens (for sensitive skin)"
 ]
 
 ingredients_avoid_acne = [
@@ -112,8 +112,8 @@ ingredients_avoid_acne = [
 ingredients_avoid_sensitive = [
     "Fragrance", "Essential Oils (Lavender, Citrus, Peppermint, Eucalyptus)",
     "Alcohol Denat", "Ethanol", "SD Alcohol", "Menthol", "Camphor",
-    "Witch Hazel", "Benzoyl Peroxide", "Salicylic Acid (konsentrasi tinggi)",
-    "Retinol/Retinoids (tanpa pengawasan dokter)", "AHA/BHA",
+    "Witch Hazel", "Benzoyl Peroxide", "Salicylic Acid (high concentration)",
+    "Retinol/Retinoids (without medical supervision)", "AHA/BHA",
     "Sodium Lauryl Sulfate", "Artificial Colorants", "Methylisothiazolinone",
     "Formaldehyde Releasers (DMDM Hydantoin, Quaternium-15)", "Phenoxyethanol",
     "Aluminum Compounds", "Propylene Glycol", "Octinoxate", "Oxybenzone"

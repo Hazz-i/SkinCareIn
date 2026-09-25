@@ -4,27 +4,35 @@ services:
     container_name: skinsight_postgres
     restart: always
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgrespassword
-      POSTGRES_DB: skinsight_db
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgrespassword}
+      POSTGRES_DB: ${POSTGRES_DB:-skinsight_db}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-skinsight_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
     networks:
       - skinsight_network
+    # Deliberately not published. Reach it with:
+    #   docker compose exec postgres psql -U $POSTGRES_USER -d $POSTGRES_DB
 
   api1:
     build:
       context: .
       dockerfile: dockerfile
     restart: always
-    depends_on:
-      - postgres
-    environment:
-      - DATABASE_URL=postgresql://postgres:postgrespassword@postgres:5432/skinsight_db
     env_file:
       - .env
+    environment:
+      # Overrides the .env value so the container always talks to the compose database.
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgrespassword}@postgres:5432/${POSTGRES_DB:-skinsight_db}
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - skinsight_network
 
@@ -33,12 +41,13 @@ services:
       context: .
       dockerfile: dockerfile
     restart: always
-    depends_on:
-      - postgres
-    environment:
-      - DATABASE_URL=postgresql://postgres:postgrespassword@postgres:5432/skinsight_db
     env_file:
       - .env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgrespassword}@postgres:5432/${POSTGRES_DB:-skinsight_db}
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - skinsight_network
 
@@ -47,7 +56,9 @@ services:
     container_name: skinsight_load_balancer
     restart: always
     ports:
-      - "8888:8888"
+      # Host port is configurable so a TLS-terminating proxy can sit in front, e.g.
+      # API_PORT=8888 docker compose up -d
+      - "${API_PORT:-8888}:8888"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:

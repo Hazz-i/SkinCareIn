@@ -28,7 +28,7 @@ def get_image_from_url(image_url: str) -> bytes:
         response.raise_for_status()
         return response.content
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Gagal mengambil gambar dari URL: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to fetch the image from the URL: {str(e)}")
 
 # Fungsi untuk mengambil gambar dari path lokal
 def get_image_from_path(image_path: str) -> bytes:
@@ -36,7 +36,7 @@ def get_image_from_path(image_path: str) -> bytes:
         with open(image_path, "rb") as f:
             return f.read()
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Gagal membaca gambar dari path lokal: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to read the image from the local path: {str(e)}")
     
 def convert_image_to_base64(image_bytes: bytes) -> str:
     return base64.b64encode(image_bytes).decode("utf-8")
@@ -54,12 +54,12 @@ def extract_text_from_image(image_bytes: bytes, client) -> str:
                         "data": base64_image,
                     }
                 },
-                "cari ingredients/bahan/komposisi dalam gambar ini dan berikan hasilnya dalam format teks biasa tanpa markdown atau formatting lainnya. buang teks yang tidak relevan seperti nama brand, nama produk, atau informasi lain yang tidak berkaitan dengan bahan, serta jika tidak terdapat ingredients sama sekali, tampilkan ingredients not found.",
+                "find the ingredients / composition in this image and return the result as plain text without any markdown or other formatting. drop irrelevant text such as brand names, product names, or any other information unrelated to the ingredients, and if there are no ingredients at all, return ingredients not found.",
             ],
         )
         return response.text
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error dari Gemini API: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error from the Gemini API: {str(e)}")
 
 # funsi untuk membersihkan teks hasil ekstraksi OCR atau AI
 def clean_extracted_text(raw_text: str) -> str:
@@ -144,7 +144,7 @@ def find_harmful_ingredients_with_details(extracted_ingredients: str, avoid_list
         if ingredient.lower() in extracted_lower:
             ingredient_detail = {
                 "name": ingredient,
-                "reason": skin_details.get(ingredient, "Tidak cocok untuk jenis kulit ini berdasarkan penelitian dermatologis.")
+                "reason": skin_details.get(ingredient, "Not suitable for this skin type based on dermatological research.")
             }
             harmful_found.append(ingredient_detail)
     

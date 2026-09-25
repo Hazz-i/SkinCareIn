@@ -50,6 +50,10 @@ openapi_tags = [
         "description": "Dermatological education guides and active ingredient topics with PostgreSQL caching and on-demand lazy scraping.",
     },
     {
+        "name": "UV Index",
+        "description": "Real-time UV Index reading and 5-day daily/hourly forecasts powered by **NOAA** via [uvindexapi.com](https://uvindexapi.com), with WHO risk levels, skincare guidance, and PostgreSQL caching (24-hour TTL). Data licensed under **CC BY-SA 4.0**.",
+    },
+    {
         "name": "Admin Operations",
         "description": "Administrative maintenance endpoints to manually trigger article resynchronization (Requires `admin` role).",
     },

@@ -1,6 +1,6 @@
 # scheduler/jobs.py
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.interval import IntervalTrigger
+from apscheduler.triggers.cron import CronTrigger
 from core.database import SessionLocal
 from services.news_service import NewsService
 from services.education_service import EducationService
@@ -9,11 +9,11 @@ from core.logger import log_action
 scheduler = AsyncIOScheduler()
 
 def run_daily_scraping_sync():
-    log_action("schedule", "Running daily 24-hour scraping synchronization for articles and educations...")
+    log_action("schedule", "Running daily scraping synchronization for articles and educations...")
     db = SessionLocal()
     try:
-        news_synced = NewsService.sync_news_from_source(db, max_pages=3)
-        edu_synced = EducationService.sync_educations_from_source(db, max_pages=2)
+        news_synced = NewsService.sync_news_from_source(db, max_pages=5, until_exhausted=True)
+        edu_synced = EducationService.sync_educations_from_source(db, max_pages=5, until_exhausted=True)
         log_action("schedule", f"Daily sync finished. Synced {news_synced} news, {edu_synced} educations.")
     except Exception as e:
         log_action("schedule", f"Error during scheduled daily sync: {str(e)}", level="error")
@@ -23,13 +23,13 @@ def run_daily_scraping_sync():
 def start_scheduler():
     scheduler.add_job(
         run_daily_scraping_sync,
-        trigger=IntervalTrigger(hours=24),
+        trigger=CronTrigger(hour=2, minute=0),
         id="daily_scraping_sync",
-        name="Sync articles and educations daily",
+        name="Daily 02:00 scrape of articles and educations",
         replace_existing=True
     )
     scheduler.start()
-    log_action("schedule", "APScheduler started (running every 24 hours).")
+    log_action("schedule", "APScheduler started (daily scrape at 02:00 server time).")
 
 def stop_scheduler():
     if scheduler.running:

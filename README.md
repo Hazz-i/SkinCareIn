@@ -39,6 +39,12 @@
 - **SlowAPI Rate Limiter:** Protects endpoints against brute-force and abuse.
 - **Uniform Tagged Logging:** Structured log tags for rapid observability (`[auth]`, `[scrap]`, `[cache]`, `[db]`, `[llm]`, `[ratelimit]`, `[schedule]`, `[api]`).
 
+### 6. ☀️ Real-time UV Index & Solar Forecast
+- **Powered by [uvindexapi.com](https://uvindexapi.com) (NOAA data):** Current UV Index reading plus 5-day daily and hourly forecasts for any coordinates worldwide, with no API key or registration required.
+- **WHO Risk Levels & Skincare Guidance:** Every reading is mapped onto the WHO Global Solar UV Index scale (`Low`, `Moderate`, `High`, `Very High`, `Extreme`) together with actionable sun-protection advice.
+- **24-Hour PostgreSQL Caching:** Forecasts are cached per rounded coordinate + timezone for 24 hours, falling back to the last known cache entry if the upstream API is temporarily unavailable.
+- **CC BY-SA 4.0 Attribution:** The `source` and `license` blocks are returned with every response so clients can display the required attribution to uvindexapi.com.
+
 ---
 
 ## 🛠️ Tech Stack
@@ -79,6 +85,7 @@ SkinSight/
 │   ├── auth.py            # Authentication endpoints (register, login, me)
 │   ├── educations.py      # Education topic feeds & lazy-cached detail
 │   ├── news.py            # News feeds & lazy-cached detail
+│   ├── uv_index.py        # Real-time UV Index & solar forecast
 │   └── skincare.py        # Ingredient scanning, skin prediction, and recommender
 ├── schemas/               # Pydantic request/response validation models
 ├── scheduler/             # APScheduler background tasks for 24h periodic sync
@@ -87,6 +94,7 @@ SkinSight/
 │   ├── educations.py      # Lab Muffin scraper with multi-page pagination
 │   ├── news.py            # BeautyJournal scraper with infinite scroll
 │   ├── functions.py       # ResNet-50 classification & image processing
+│   ├── uvindex.py         # UV Index API client (NOAA data via uvindexapi.com)
 │   └── ingredients.py     # Ingredient safety reference lists
 ├── nginx/                 # Nginx load balancer configuration
 │   └── nginx.conf         # Round-robin reverse proxy configuration
@@ -125,9 +133,14 @@ cp .env.example .env
 | `ADMIN_USERNAME` | `admin` | Username of the default administrator account |
 | `ADMIN_PASSWORD` | `Admin123!` | Password of the default administrator account |
 | `CORS_ORIGIN` | `http://localhost:3000,http://localhost:8888` | Comma-separated list of allowed CORS origins |
-| `GEMINI_API_KEY` | `your_gemini_api_key_here` | Google Gemini API key for LiteLLM Vision / OCR |
-| `LLM_MODEL` | `gemini/gemini-2.5-flash` | Primary vision LLM model |
-| `LLM_FALLBACKS` | `gemini/gemini-1.5-flash` | Comma-separated fallback models |
+| `LLM_API_BASE` | `http://localhost:20128/v1` | OpenAI-compatible gateway URL (default: local [9Router](https://9router.com)). Leave empty to call Gemini directly. |
+| `LLM_API_KEY` | `sk_9router` | API key for the gateway above (copy it from the 9Router dashboard). |
+| `GEMINI_API_KEY` | `your_gemini_api_key_here` | Google Gemini API key — only used when `LLM_API_KEY` is empty. |
+| `LLM_MODEL` | `openai/vertex/gemini-2.5-flash` | Primary vision model, written as `openai/<model or combo>` for a gateway. |
+| `LLM_FALLBACKS` | *(empty)* | Comma-separated fallback models (9Router already fails over on its own). |
+| `UV_INDEX_API_BASE_URL` | `https://uvindexapi.com/api/v1` | UV Index API base URL (no API key required) |
+| `UV_INDEX_API_TIMEOUT` | `15` | Timeout in seconds for UV Index API requests |
+| `UV_INDEX_CACHE_TTL_HOURS` | `24` | How long a cached UV Index forecast stays fresh |
 | `RATE_LIMIT_DEFAULT` | `60/minute` | Default endpoint rate limit |
 | `RATE_LIMIT_HEAVY` | `10/minute` | Strict rate limit for compute-heavy endpoints |
 
@@ -288,23 +301,31 @@ All endpoints are organized under `/api/v1/`:
 ### 2. Mobile Personalized Dashboard (`/api/v1/dashboard`)
 - `GET /api/v1/dashboard` — Main home feed aggregating user health summary, dermatological tips, medical warnings, negative ingredient filtered product recommendations, and recent news/educations *(Requires Token)*.
 
-### 3. Skincare Intelligence & Knowledge Base (`/api/v1/skincare`)
+### 3. UV Index & Solar Forecast (`/api/v1/uv-index`)
+- `GET /api/v1/uv-index?latitude=...&longitude=...` — Retrieve the current UV Index, today & tomorrow maximums, WHO risk level, and sun-protection advice for any coordinates (cached in PostgreSQL for 24 hours).
+- Optional query parameters:
+  - `timezone` — IANA timezone identifier, `UTC`, or `Auto` to infer from coordinates (default: `Auto`).
+  - `daily=true|false` — Include the 5-day daily forecast (default: `true`).
+  - `hourly=true|false` — Include the hourly forecast (default: `false`).
+- Public endpoint — no authentication required. Data sourced from **NOAA** via [uvindexapi.com](https://uvindexapi.com) under **CC BY-SA 4.0**; the `source` and `license` blocks are returned on every response for attribution.
+
+### 4. Skincare Intelligence & Knowledge Base (`/api/v1/skincare`)
 - `GET /api/v1/skincare/ingredients-to-avoid?skin_type=...` — Query medical-grade prohibited cosmetic ingredients and care tips by skin type (`sensitive`, `oily`, `dry`, `combination`, `acne-prone`, `normal`).
 - `POST /api/v1/skincare/read-ingredients` — Extract and assess skincare ingredients from product images via **LiteLLM**.
 - `POST /api/v1/skincare/predict-skin` — Classify skin condition (`dry`, `normal`, `oily`) from facial photos via **ResNet-50**.
 - `POST /api/v1/skincare/recommendations` — Query product recommendations matching a specified skin type.
 
-### 3. News & Education Caching (`/api/v1/news`, `/api/v1/educations`)
+### 5. News & Education Caching (`/api/v1/news`, `/api/v1/educations`)
 - `GET /api/v1/news` — Retrieve cached BeautyJournal news & beauty A-Z items (supports infinite scroll pagination via `page`, refreshed daily).
 - `POST /api/v1/news/detail` — Retrieve full BeautyJournal article/glossary detail (scraped once, permanently cached in PostgreSQL).
 - `GET /api/v1/educations` — Retrieve cached Lab Muffin science education list (supports multi-page pagination via `page`, refreshed daily).
 - `POST /api/v1/educations/detail` — Retrieve full Lab Muffin article formatted in clean Markdown (lazy cached in PostgreSQL).
 
-### 4. Administrator Operations (`/api/v1/admin`)
+### 6. Administrator Operations (`/api/v1/admin`)
 - `POST /api/v1/admin/sync/news` — Manually trigger background scraping & cache update for news *(Requires 'admin' role)*.
 - `POST /api/v1/admin/sync/educations` — Manually trigger background scraping & cache update for education *(Requires 'admin' role)*.
 
-### 5. Health Check (`/api/v1/health`)
+### 7. Health Check (`/api/v1/health`)
 - `GET /api/v1/health` — Returns system health, uptime, and version status.
 
 ---

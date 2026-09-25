@@ -1,23 +1,38 @@
 # services/news_service.py
-from datetime import datetime
+from datetime import datetime, timedelta
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from models.article import NewsArticle, NewsArticleDetail
 from helper.news import get_news_list, get_news
 from core.logger import log_action
 from fastapi import HTTPException
 
+# Cached content is refreshed at most once every 2 days (48 hours).
+SYNC_TTL_HOURS = 48
+
+# BeautyJournal serves the feed in pages of 15; a short page means the feed is exhausted.
+NEWS_PAGE_SIZE = 15
+MAX_SYNC_PAGES = 10
+
 class NewsService:
     @staticmethod
-    def sync_news_from_source(db: Session, max_pages: int = 3) -> int:
-        log_action("scrap", f"Starting background sync of news list (pages 1 to {max_pages})...")
+    def sync_news_from_source(
+        db: Session, max_pages: int = 3, until_exhausted: bool = False
+    ) -> int:
+        """Scrape the feed and upsert it. With `until_exhausted`, keep paging (like the
+        site's infinite scroll) until a short/empty page or the page cap is reached."""
+        log_action("scrap", f"Starting background sync of news list (up to {max_pages} pages)...")
         synced_count = 0
         for page in range(1, max_pages + 1):
             try:
-                scraped_data = get_news_list(page=page)
+                scraped_data = get_news_list(page=page, page_size=NEWS_PAGE_SIZE)
             except Exception as e:
                 log_action("scrap", f"Error scraping page {page}: {e}", level="warning")
-                continue
+                break
             articles = scraped_data.get("Article_List", []) if scraped_data else []
+            if not articles:
+                # No more items on the remote feed.
+                break
             for item in articles:
                 link = item.get("Link")
                 if not link:
@@ -42,15 +57,23 @@ class NewsService:
                     db.add(new_art)
                     synced_count += 1
             db.commit()
+            if until_exhausted and len(articles) < NEWS_PAGE_SIZE:
+                # Reached the end of the feed.
+                break
         log_action("db", f"Synchronized news articles cache. Added {synced_count} new records.")
         return synced_count
 
     @staticmethod
     def get_cached_news_list(db: Session, page: int = 1, page_size: int = 15) -> dict:
         total = db.query(NewsArticle).count()
-        # If DB is empty, trigger an initial sync
-        if total == 0:
-            NewsService.sync_news_from_source(db, max_pages=1)
+        latest = db.query(func.max(NewsArticle.fetched_at)).scalar()
+
+        # Refresh once the TTL window has elapsed, not only when the table is empty.
+        is_stale = latest is None or (datetime.utcnow() - latest) > timedelta(hours=SYNC_TTL_HOURS)
+        if total == 0 or is_stale:
+            # The tab opening triggers a full walk of the feed (infinite scroll order),
+            # so every page requested later is already cached for the next visitor.
+            NewsService.sync_news_from_source(db, max_pages=MAX_SYNC_PAGES, until_exhausted=True)
             total = db.query(NewsArticle).count()
 
         offset = (page - 1) * page_size

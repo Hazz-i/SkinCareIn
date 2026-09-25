@@ -1,5 +1,5 @@
 # schemas/auth.py
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, List
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
@@ -34,6 +34,7 @@ class TokenResponse(BaseModel):
 class OnboardingRequest(BaseModel):
     first_name: str = Field(..., min_length=1, max_length=100)
     last_name: Optional[str] = Field(None, max_length=100)
+    date_of_birth: Optional[date] = None
     age: int = Field(..., ge=10, le=120)
     gender: str = Field(..., pattern="^(male|female|other)$")
     skin_type: str = Field(..., pattern="^(dry|normal|oily|combination|sensitive|acne-prone)$")
@@ -42,6 +43,7 @@ class OnboardingRequest(BaseModel):
 class UpdateProfileRequest(BaseModel):
     first_name: Optional[str] = Field(None, max_length=100)
     last_name: Optional[str] = Field(None, max_length=100)
+    date_of_birth: Optional[date] = None
     age: Optional[int] = Field(None, ge=10, le=120)
     gender: Optional[str] = Field(None, pattern="^(male|female|other)$")
     skin_type: Optional[str] = Field(None, pattern="^(dry|normal|oily|combination|sensitive|acne-prone)$")
@@ -53,6 +55,7 @@ class UserProfileResponse(BaseModel):
     username: str
     first_name: Optional[str] = None
     last_name: Optional[str] = None
+    date_of_birth: Optional[date] = None
     age: Optional[int] = None
     gender: Optional[str] = None
     skin_type: Optional[str] = None
@@ -65,3 +68,29 @@ class UserProfileResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetOTPRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(..., min_length=6, max_length=6)
+
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    reset_token: str = Field(..., min_length=10)
+    new_password: str = Field(..., min_length=6)
+
+
+class ResetTokenResponse(BaseModel):
+    message: str
+    email: str
+    reset_token: str
+
+
+class MessageResponse(BaseModel):
+    message: str
+    email: str

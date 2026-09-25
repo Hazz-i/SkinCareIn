@@ -16,7 +16,7 @@ def sync_news_manual(
 ):
     """Trigger manual scraping and synchronization of latest skincare news articles to PostgreSQL database (Requires 'admin' role)."""
     log_action("admin", f"Manual news sync triggered by admin: {admin_user.email}")
-    count = NewsService.sync_news_from_source(db, max_pages=3)
+    count = NewsService.sync_news_from_source(db, max_pages=5, until_exhausted=True)
     return {"status": "success", "message": f"Successfully synchronized {count} latest news articles.", "synced_count": count}
 
 @router.post("/sync/educations", summary="Manual Sync Education Topics (Admin Only)")
@@ -26,5 +26,5 @@ def sync_educations_manual(
 ):
     """Trigger manual scraping and synchronization of latest skincare education topics to PostgreSQL database (Requires 'admin' role)."""
     log_action("admin", f"Manual educations sync triggered by admin: {admin_user.email}")
-    count = EducationService.sync_educations_from_source(db, max_pages=2)
+    count = EducationService.sync_educations_from_source(db, max_pages=5, until_exhausted=True)
     return {"status": "success", "message": f"Successfully synchronized {count} latest education topics.", "synced_count": count}
